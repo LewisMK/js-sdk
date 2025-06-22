@@ -10,38 +10,78 @@ export const cutNumber = (num: number | string, lenght: number) => {};
 
 export const zero = new Decimal(0);
 
+/** if num is undefined, returns options?.fallback || '-', otherwise it formats */
+export const commifyOptional = (
+  num?: number | string,
+  options?: {
+    fix?: number;
+    fallback?: string;
+    padEnd?: boolean;
+    /// default is '0'
+    fillString?: string;
+    prefix?: string;
+  },
+): string => {
+  // if num convert to num failed, return fallback
+  if (typeof num === "string" && isNaN(Number(num))) {
+    return options?.fallback || "--";
+  }
+
+  const prefix = options?.prefix || "";
+  if (typeof num === "undefined") {
+    return prefix + (options?.fallback || "--");
+  }
+  const value = commify(num, options?.fix);
+
+  if (options && options.padEnd && options.fix) {
+    const fillString = options?.fillString || "0";
+    const hasDecimal = value.includes(".");
+    const list = value.split(".");
+    if (hasDecimal) {
+      return prefix + list[0] + "." + list[1].padEnd(options.fix, fillString);
+    }
+    return prefix + list[0] + "." + "".padEnd(options.fix, fillString);
+  }
+  return prefix + value;
+};
+
 export const commify = (num: number | string, fix?: number): string => {
-  var parts = num.toString().split(".");
+  const str = `${num}`;
+  const parts = str.split(".");
   const numberPart = parts[0];
   const decimalPart = parts[1];
   const thousands = /\B(?=(\d{3})+(?!\d))/g;
 
-  const endsWithPoint =
-    num.toString().endsWith(".") && num.toString().length > 1;
-  return (
+  const endsWithPoint = str.endsWith(".") && str.length > 1;
+  const result =
     numberPart.replace(thousands, ",") +
     (decimalPart
       ? "." + decimalPart.substring(0, fix || decimalPart.length)
       : endsWithPoint
-      ? "."
-      : "")
+        ? "."
+        : "");
+
+  if (fix === 0 && result.includes(".")) {
+    return result.substring(0, result.indexOf("."));
+  }
+  return result;
+};
+
+export const toNonExponential = (num: number) => {
+  const m = num.toExponential().match(/\d(?:\.(\d*))?e([+-]\d+)/);
+  if (!Array.isArray(m)) {
+    return num;
+  }
+  return num.toFixed(
+    Math.max(0, (m[1] || "").length - (m[2] as unknown as number)),
   );
 };
 
-export const getPrecisionByNumber = (num: number | string): number => {
-  // if(Math.floor(num) === num) return 0;
+export const getPrecisionByNumber = (num: number | string) => {
   num = toNonExponential(Number(num));
   const parts = num.toString().split(".");
   return parts[1] ? parts[1].length : 0;
 };
-
-export function toNonExponential(num: number) {
-  const m = num.toExponential().match(/\d(?:\.(\d*))?e([+-]\d+)/);
-  if (!Array.isArray(m)) return num;
-  return num.toFixed(
-    Math.max(0, (m[1] || "").length - (m[2] as unknown as number))
-  );
-}
 
 /**
  *
@@ -51,8 +91,12 @@ export function toNonExponential(num: number) {
  */
 export function numberToHumanStyle(
   number: number,
-  decimalPlaces: number = 2
+  decimalPlaces: number = 2,
+  options?: {
+    padding?: boolean;
+  },
 ): string {
+  const { padding } = options || {};
   const abbreviations = ["", "K", "M", "B", "T"];
 
   let index = 0;
@@ -61,10 +105,42 @@ export function numberToHumanStyle(
     index++;
   }
 
-  const roundedNumber = number.toFixed(decimalPlaces);
+  // const roundedNumber = number.toFixed(decimalPlaces);
+  let roundedNumber = new Decimal(number)
+    .toFixed(decimalPlaces, Decimal.ROUND_DOWN)
+    .toString();
+
+  // const roundedNumber = padding
+  //   ? number.toFixed(decimalPlaces)
+  //   : number.toString();
+
+  roundedNumber = roundedNumber.replace(/\.0+$/, "");
 
   return `${roundedNumber}${abbreviations[index]}`;
 }
+
+// export function numberToHumanStyle(num: number, dp: number = 0): string {
+//   const absNum = Math.abs(num);
+//   let formattedNum = "";
+
+//   let exp;
+
+//   if (absNum >= 1e12) {
+//     formattedNum = (num / 1e12).toFixed(dp) + "T";
+//   } else if (absNum >= 1e9) {
+//     formattedNum = (num / 1e9).toFixed(dp) + "B";
+//   } else if (absNum >= 1e6) {
+//     formattedNum = (num / 1e6).toFixed(dp) + "M";
+//   } else if (absNum >= 1e3) {
+//     formattedNum = (num / 1e3).toFixed(dp) + "K";
+//   } else {
+//     formattedNum = num.toString();
+//   }
+
+//   formattedNum = formattedNum.replace(/\.0$/, "");
+
+//   return formattedNum;
+// }
 
 export function parseNumStr(str: string | number): Decimal | undefined {
   const value = str.toString();
@@ -105,22 +181,24 @@ export function parseNumStr(str: string | number): Decimal | undefined {
 //** remove trailing zeros 0.00000100 => 0.000001, 1 => 1 */
 export function removeTrailingZeros(
   value: number,
-  fixedCount: number = 16
+  fixedCount: number = 16,
 ): string {
   const text = `${value}`;
-  let scientificNotationPattern = /^[-+]?[0-9]+(\.[0-9]+)?[eE][-+]?[0-9]+$/;
-  let isScientific = scientificNotationPattern.test(text);
+  const scientificNotationPattern = /^[-+]?[0-9]+(\.[0-9]+)?[eE][-+]?[0-9]+$/;
+  const isScientific = scientificNotationPattern.test(text);
   if (!value.toString().includes(".") && !isScientific) {
     return `${value}`;
   }
-  let formattedNumber = new Decimal(value)
+  const formattedNumber = new Decimal(value)
     .toFixed(fixedCount)
     .replace(/(\.[0-9]*[1-9])0+$/, "$1");
   return formattedNumber;
 }
 
 export const todpIfNeed = (value: string | number, dp: number) => {
-  if (value === undefined || value === "") return value;
+  if (value === undefined || value === "") {
+    return value;
+  }
 
   if (typeof value === "number") {
     value = value.toString();
@@ -141,8 +219,4 @@ export const todpIfNeed = (value: string | number, dp: number) => {
   }
 
   return `${numbers[0]}.${numbers[1].substring(0, dp)}`;
-
-  // return value.substring(0, value.indexOf(".") + dp + 1);
-
-  // return new Decimal(value).todp(dp, round).toNumber();
 };

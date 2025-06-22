@@ -4,7 +4,7 @@ import { SidePicker } from "@/block/pickers";
 import { Label } from "@/label";
 import { Checkbox } from "@/checkbox";
 import { useOrderStream } from "@orderly.network/hooks";
-import { modal } from "@/modal";
+import { modal } from "@orderly.network/ui";
 
 interface Props {
   onCancelAll?: () => Promise<void>;
@@ -67,6 +67,7 @@ export const Toolbar: FC<Props> = (props) => {
         size={"small"}
         color={"tertiary"}
         onClick={cancelAllOrder}
+        className="orderly-text-3xs orderly-text-base-contrast-36"
       >
         Cancel all
       </Button>

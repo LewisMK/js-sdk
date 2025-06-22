@@ -1,24 +1,27 @@
-import { OrderEntity, OrderType } from "@orderly.network/types";
+import { compose, head } from "ramda";
+import {
+  API,
+  OrderlyOrder,
+  OrderSide,
+  OrderType,
+} from "@orderly.network/types";
 import { Decimal } from "@orderly.network/utils";
-
-export type OrderEntityKey = keyof OrderEntity & string;
+import { FullOrderState } from "../next/useOrderEntry/useOrderStore";
+import { tpslCalculateHelper } from "../orderly/useTakeProfitAndStopLoss/tp_slUtils";
 
 // index 3: markPrice
 type orderEntryInputs = [
-  Partial<OrderEntity>,
+  Partial<OrderlyOrder>,
   // to update field
-  keyof OrderEntity,
+  keyof OrderlyOrder,
   any,
   number,
-  {
-    baseDP: number;
-    quoteDP: number;
-  }
+  API.SymbolExt,
 ];
 
 type orderEntryInputHandle = (inputs: orderEntryInputs) => orderEntryInputs;
 
-const needNumberOnlyFields: (keyof OrderEntity)[] = [
+const needNumberOnlyFields: (keyof OrderlyOrder)[] = [
   "order_quantity",
   "order_price",
   "trigger_price",
@@ -78,6 +81,19 @@ export function orderTypeHandle(inputs: orderEntryInputs): orderEntryInputs {
     }
   }
 
+  if (value === OrderType.MARKET || value === OrderType.LIMIT) {
+    values.trigger_price = undefined;
+  }
+
+  if (value === OrderType.MARKET || value === OrderType.STOP_MARKET) {
+    // if the type is market, price use markPrice
+  }
+
+  // if (value === OrderType.STOP_MARKET || value === OrderType.STOP_LIMIT) {
+  //   values.algo_type = AlgoOrderRootType.STOP;
+  //   // values.type = OrderType.S
+  // }
+
   return [values, input, value, markPrice, config];
 }
 
@@ -91,19 +107,19 @@ export function orderEntityFormatHandle(baseTick: number, quoteTick: number) {
     const [values, input, value, markPrice, config] = inputs;
 
     // TODO: formatting only deals with the thousandths and so on
-    // if (!!values.order_quantity) {
+    // if (!!values.quantity) {
     //
-    //   const d = new Decimal(values.order_quantity);
+    //   const d = new Decimal(values.quantity);
     //   const dp = d.dp();
     //   if (dp > quoteTick) {
-    //     values.order_quantity = d.toDecimalPlaces(baseTick).toNumber();
+    //     values.quantity = d.toDecimalPlaces(baseTick).toNumber();
     //   }
     // }
 
-    // if (!!values.order_price && values.order_type === OrderType.LIMIT) {
-    //   const sd = new Decimal(values.order_price).sd(false);
+    // if (!!values.price && values.type === OrderType.LIMIT) {
+    //   const sd = new Decimal(values.price).sd(false);
     //   if (sd > quoteTick) {
-    //     values.order_price = new Decimal(values.order_price).toFixed(quoteTick);
+    //     values.price = new Decimal(values.price).toFixed(quoteTick);
     //   }
     // }
 
@@ -134,11 +150,11 @@ function priceInputHandle(inputs: orderEntryInputs): orderEntryInputs {
   const price = new Decimal(value);
   const priceDP = price.dp();
 
-  if (priceDP > config.quoteDP) {
-    values.order_price = price.toDecimalPlaces(config.quoteDP).toString();
+  if (priceDP > config.quote_dp) {
+    values.order_price = price.toDecimalPlaces(config.quote_dp).toString();
   }
 
-  price.toDecimalPlaces(Math.min(priceDP, config.quoteDP));
+  price.toDecimalPlaces(Math.min(priceDP, config.quote_dp));
 
   if (!values.order_quantity && !values.total) {
     return [values, input, value, markPrice, config];
@@ -149,13 +165,13 @@ function priceInputHandle(inputs: orderEntryInputs): orderEntryInputs {
   };
 
   if (values.order_quantity) {
-    // total = price.mul(values.order_quantity);
+    // total = price.mul(values.quantity);
     newValue.total = price.mul(values.order_quantity).todp(2).toString();
   } else if (values.total) {
     // total = new Decimal(values.total);
     newValue.order_quantity = new Decimal(values.total)
       .div(price)
-      .todp(config.baseDP)
+      .todp(config.base_dp)
       .toString();
   }
 
@@ -189,12 +205,12 @@ function quantityInputHandle(inputs: orderEntryInputs): orderEntryInputs {
   const quantityDP = quantity.dp();
 
   // check the length for precision and recalculate
-  if (quantityDP > config.baseDP) {
-    quantity = quantity.toDecimalPlaces(config.baseDP);
-    values.order_quantity = quantity.toNumber();
+  if (quantityDP > config.base_dp) {
+    quantity = quantity.toDecimalPlaces(config.base_dp);
+    values.order_quantity = quantity.toString();
   }
 
-  // if(values.order_type === OrderType.MARKET) {
+  // if(values.type === OrderType.MARKET) {
 
   // }
 
@@ -202,7 +218,12 @@ function quantityInputHandle(inputs: orderEntryInputs): orderEntryInputs {
     values.order_type === OrderType.MARKET ||
     values.order_type === OrderType.STOP_MARKET
   ) {
+    if (!markPrice) {
+      console.warn("[ORDERLY]markPrice is required for market order");
+      return [values, input, value, markPrice, config];
+    }
     const price = markPrice;
+    values.order_price = "";
     values.total = quantity.mul(price).todp(2).toString();
   }
 
@@ -213,7 +234,7 @@ function quantityInputHandle(inputs: orderEntryInputs): orderEntryInputs {
     if (values.order_price) {
       const price = Number(values.order_price);
       const total = quantity.mul(price);
-      values.total = total.todp(config.quoteDP).toString();
+      values.total = total.todp(config.quote_dp).toString();
     } else {
       values.total = "";
     }
@@ -225,7 +246,6 @@ function quantityInputHandle(inputs: orderEntryInputs): orderEntryInputs {
   return [
     {
       ...values,
-      // total: total.todp(2).toNumber(),
     },
     input,
     value,
@@ -257,25 +277,68 @@ function totalInputHandle(inputs: orderEntryInputs): orderEntryInputs {
   let total = new Decimal(value);
   const totalDP = total.dp();
 
-  if (totalDP > config.quoteDP) {
-    total = total.toDecimalPlaces(config.quoteDP);
+  if (totalDP > config.quote_dp) {
+    total = total.toDecimalPlaces(config.quote_dp);
     values.total = total.toString();
   }
 
   const quantity = total.div(price);
+  let order_quantity = quantity
+    .toDecimalPlaces(Math.min(config.base_dp, quantity.dp()))
+    .toString();
+
+  if (config.base_tick >= 1) {
+    order_quantity = formatNumber(
+      order_quantity,
+      new Decimal(config?.base_tick || "0").toNumber(),
+    )!;
+  }
 
   return [
     {
       ...values,
-      order_quantity: quantity
-        .toDecimalPlaces(Math.min(config.baseDP, quantity.dp()))
-        .toString(),
+      order_quantity,
     },
     input,
     value,
     markPrice,
     config,
   ];
+}
+
+function tpslInputHandle(inputs: orderEntryInputs): orderEntryInputs {
+  const [values, input, value, markPrice, config] = inputs;
+
+  const price =
+    values.order_type === OrderType.MARKET ||
+    values.order_type === OrderType.STOP_MARKET
+      ? markPrice
+      : values.order_price;
+
+  // if price or quantity is empty, return
+  if (!price || !values.order_quantity) {
+    return [values, input, value, markPrice, config];
+  }
+
+  const _tpslValue = tpslCalculateHelper(
+    input,
+    {
+      key: input,
+      value,
+      entryPrice: price, // order price or mark price
+      qty:
+        values.side === OrderSide.BUY
+          ? Number(values.order_quantity)
+          : Number(values.order_quantity) * -1,
+      orderSide: values.side!,
+      // values: newValues,
+    },
+    {
+      symbol: config,
+    },
+  );
+
+  return [{ ...values, ..._tpslValue }, input, value, markPrice, config];
 }
 
 /**
@@ -288,7 +351,7 @@ function otherInputHandle(inputs: orderEntryInputs): orderEntryInputs {
 }
 
 export const getCalculateHandler = (
-  fieldName: string
+  fieldName: keyof OrderlyOrder,
 ): orderEntryInputHandle => {
   switch (fieldName) {
     case "order_type":
@@ -302,6 +365,16 @@ export const getCalculateHandler = (
     case "total": {
       return totalInputHandle;
     }
+    case "tp_pnl":
+    case "sl_pnl":
+    case "tp_trigger_price":
+    case "sl_trigger_price":
+    case "tp_offset":
+    case "sl_offset":
+    case "tp_offset_percentage":
+    case "sl_offset_percentage":
+      return tpslInputHandle;
+
     default:
       return otherInputHandle;
   }
@@ -310,23 +383,22 @@ export const getCalculateHandler = (
 //** format number */
 export function formatNumber(
   qty?: string | number,
-  dp?: number | string
+  dp?: number | string,
 ): string | undefined {
   if (typeof qty === "undefined") return qty;
   if (typeof dp === "undefined") return `${qty}`;
 
   // console.log("qty", qty, "dp", dp);
-  
+
   const _qty = `${qty}`.replace(/,/g, "");
-  
-  
+
   try {
     const _dp = new Decimal(dp);
     const _qtyDecimal = new Decimal(_qty);
-    
+
     if (_dp.lessThan(1)) {
       if (`${_qty}`.endsWith(".")) return `${_qty}`;
-      
+
       const numStr = dp.toString();
       const decimalIndex = numStr.indexOf(".");
       const digitsAfterDecimal =
@@ -348,7 +420,60 @@ export function formatNumber(
       .toDecimalPlaces(0, Decimal.ROUND_DOWN)
       .mul(dp)
       .toString();
-  } catch (e) {    
+  } catch (e) {
     return undefined;
   }
+}
+
+export function calculate(
+  values: Partial<FullOrderState>,
+  fieldName:
+    | "symbol"
+    | "order_type"
+    | "order_type_ext"
+    | "order_price"
+    | "order_quantity"
+    | "order_amount"
+    | "visible_quantity"
+    | "side"
+    | "reduce_only"
+    | "slippage"
+    | "order_tag"
+    | "level"
+    | "post_only_adjust"
+    | "total"
+    | "algo_type"
+    | "trigger_price_type"
+    | "trigger_price"
+    | "child_orders"
+    | "tp_pnl"
+    | "tp_offset"
+    | "tp_offset_percentage"
+    | "tp_ROI"
+    | "tp_trigger_price"
+    | "sl_pnl"
+    | "sl_offset"
+    | "sl_offset_percentage"
+    | "sl_ROI"
+    | "sl_trigger_price"
+    | "quantity"
+    | "price"
+    | "type",
+  value: any,
+  markPrice: number,
+  config: API.SymbolExt,
+): Partial<FullOrderState> {
+  // console.log("calculate", values, fieldName, value, options);
+  const fieldHandler = getCalculateHandler(fieldName);
+
+  const newValues = compose<any, any, any, Partial<FullOrderState>>(
+    head,
+    // orderEntityFormatHandle(baseDP, quoteDP),
+    fieldHandler,
+    baseInputHandle,
+  )([values, fieldName, value, markPrice, config]);
+
+  // if fieldName is quantity/price,recalculate the tp/sl
+
+  return newValues as Partial<FullOrderState>;
 }

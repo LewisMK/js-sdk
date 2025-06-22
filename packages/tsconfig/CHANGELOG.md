@@ -1,5 +1,146 @@
 # tsconfig
 
+## 0.6.0
+
+### Minor Changes
+
+- publish
+- 4e5f109: publish
+
+## 0.6.0-alpha.0
+
+### Minor Changes
+
+- publish
+
+## 0.5.0
+
+### Minor Changes
+
+- e1badae: publish
+- publish
+
+## 0.5.0-alpha.0
+
+### Minor Changes
+
+- publish
+
+## 0.4.3
+
+### Patch Changes
+
+- publish
+- 5ba2a31a8: publish
+
+## 0.4.3-alpha.0
+
+### Patch Changes
+
+- publish
+
+## 0.4.2
+
+### Patch Changes
+
+- publish
+- 7874fa6dd: publish
+
+## 0.4.2-alpha.0
+
+### Patch Changes
+
+- publish
+
+## 0.4.1
+
+### Patch Changes
+
+- publish
+- 0b52044b6: publish
+
+## 0.4.1-alpha.0
+
+### Patch Changes
+
+- publish
+
+## 0.4.0
+
+### Minor Changes
+
+- publish
+
+### Patch Changes
+
+- ba163f4ce: publish
+
+## 0.3.23-alpha.0
+
+### Patch Changes
+
+- publish
+
+## 0.3.22
+
+### Patch Changes
+
+- 423ab1d38: update
+
+## 0.3.22-alpha.0
+
+### Patch Changes
+
+- update
+
+## 0.3.21
+
+### Patch Changes
+
+- 74c2c433e: fix bugs
+
+## 0.3.21-alpha.0
+
+### Patch Changes
+
+- fix bugs
+
+## 0.3.20
+
+### Patch Changes
+
+- 7f737173b: update
+
+## 0.3.20-alpha.0
+
+### Patch Changes
+
+- update
+
+## 0.3.19
+
+### Patch Changes
+
+- cca30140b: fix ledger issues
+
+## 0.3.19-alpha.0
+
+### Patch Changes
+
+- fix ledger issues
+
+## 0.3.18
+
+### Patch Changes
+
+- a3becba1a: update
+
+## 0.3.18-alpha.0
+
+### Patch Changes
+
+- update
+
 ## 0.3.17
 
 ### Patch Changes

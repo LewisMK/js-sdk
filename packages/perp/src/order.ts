@@ -17,18 +17,18 @@ export function minPrice(markprice: number, range: number) {
 }
 
 /**
- * Scrope price when placing an order
+ * Scope price when placing an order
  * @returns number
  */
-export function scropePrice(
+export function scopePrice(
   price: number,
-  scrope: number,
+  scope: number,
   side: "BUY" | "SELL"
 ): number {
   if (side === "BUY") {
-    return price * (1 - scrope);
+    return price * (1 - scope);
   }
-  return price * (1 + scrope);
+  return price * (1 + scope);
 }
 
 /**
@@ -92,7 +92,10 @@ export function estLiqPrice(inputs: EstimatedLiquidationPriceInputs): number {
 
   let newTotalMM = zero;
 
-  const basePrice = positions.length === 0 ? newOrder.price : markPrice;
+  const hasPosition =
+    positions.filter((item) => item.position_qty > 0).length > 0;
+
+  const basePrice = hasPosition ? markPrice : newOrder.price;
 
   const newOrderNotional = new Decimal(newOrder.qty).mul(newOrder.price);
 

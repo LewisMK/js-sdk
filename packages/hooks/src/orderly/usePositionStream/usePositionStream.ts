@@ -1,260 +1,130 @@
-import { account, positions } from "@orderly.network/perp";
+import { useEffect, useMemo, useRef } from "react";
+import { pathOr } from "ramda";
+import { omit } from "ramda";
+import { type SWRConfiguration } from "swr";
 import {
   AlgoOrderRootType,
-  type API,
-  OrderEntity,
   OrderStatus,
+  type API,
 } from "@orderly.network/types";
-import { Decimal, zero } from "@orderly.network/utils";
-import { pathOr, propOr } from "ramda";
-import { useEffect, useMemo, useState } from "react";
-import { type SWRConfiguration } from "swr";
-import { usePrivateQuery } from "../../usePrivateQuery";
+import { useApiStatusStore } from "../../next/apiStatus/apiStatus.store";
+import { CalculatorScope } from "../../types";
+import { useCalculatorService } from "../../useCalculatorService";
 import { createGetter } from "../../utils/createGetter";
-import { parseHolding } from "../../utils/parseHolding";
+import { useAppStore } from "../appStore";
+import { PositionCalculator } from "../calculator/positions";
 import { useOrderStream } from "../orderlyHooks";
-import { useFundingRates } from "../useFundingRates";
-import { useMarketsStream } from "../useMarketsStream";
-import { useMarkPricesStream } from "../useMarkPricesStream";
-import { useSymbolsInfo } from "../useSymbolsInfo";
+import { POSITION_EMPTY, usePositionStore } from "./usePosition.store";
 import { findPositionTPSLFromOrders, findTPSLFromOrder } from "./utils";
 
-type PriceMode = "markPrice" | "lastPrice";
+// import { usePosition } from "./usePosition";
 
-export interface PositionReturn {
-  data: any[];
-  loading: boolean;
-  close: (
-    order: Pick<OrderEntity, "order_type" | "order_price" | "side">
-  ) => void;
-}
+export type PriceMode = "markPrice" | "lastPrice";
+
+const scopes = [
+  CalculatorScope.POSITION,
+  CalculatorScope.MARK_PRICE,
+  CalculatorScope.INDEX_PRICE,
+];
 
 export const usePositionStream = (
   /**
    * If symbol is passed, only the position of that symbol will be returned.
    */
-  symbol?: string,
+  symbol: string = "all",
   options?: SWRConfiguration & {
     calcMode?: PriceMode;
     /**
      * If true, the pending order will be included in the result.
      */
     includedPendingOrder?: boolean;
-  }
+  },
 ) => {
-  const symbolInfo = useSymbolsInfo();
+  const { calcMode } = options || {};
 
   const { includedPendingOrder = false } = options || {};
 
-  const { data: accountInfo } =
-    usePrivateQuery<API.AccountInfo>("/v1/client/info");
+  const positionCalculator = useRef<PositionCalculator | null>(null);
+  const calculatorService = useCalculatorService();
 
-  const { data: holding } = usePrivateQuery<API.Holding[]>(
-    "/v1/client/holding",
+  const [tpslOrders] = useOrderStream(
     {
-      formatter: (data) => {
-        return data.holding;
-      },
-    }
+      symbol: symbol === "all" ? undefined : symbol,
+      status: OrderStatus.INCOMPLETE,
+      includes: [AlgoOrderRootType.POSITIONAL_TP_SL, AlgoOrderRootType.TP_SL],
+      size: 500,
+    },
+    {
+      keeplive: true,
+    },
   );
 
-  const fundingRates = useFundingRates();
-
-  const {
-    data,
-    error,
-    mutate: refreshPositions,
-  } = usePrivateQuery<API.PositionInfo>(`/v1/positions`, {
-    // revalidateOnFocus: false,
-    // revalidateOnReconnect: false,
-    // dedupingInterval: 200,
-    // keepPreviousData: false,
-    // revalidateIfStale: true,
-    ...options,
-
-    formatter: (data) => data,
-    onError: (err) => {},
-  });
-
-  const { data: markPrices } = useMarkPricesStream();
-
-  // get TP/SL orders;
-
-  const [tpslOrders, { refresh }] = useOrderStream({
-    status: OrderStatus.INCOMPLETE,
-    includes: [AlgoOrderRootType.POSITIONAL_TP_SL, AlgoOrderRootType.TP_SL],
-  });
-  //
-
-  const refreshAlgoAndPosition = () => {
-    refresh();
-    refreshPositions();
-  };
-
-  // console.log("---------------");
-
-  const [priceMode, setPriceMode] = useState(options?.calcMode || "markPrice");
+  const { positions: positionStatus } = useApiStatusStore(
+    (state) => state.apis,
+  );
 
   useEffect(() => {
-    if (options?.calcMode && priceMode !== options?.calcMode) {
-      setPriceMode(options?.calcMode);
+    if (symbol === "all") {
+      return;
     }
-  }, [options?.calcMode]);
-
-  const { data: tickers } = useMarketsStream();
-
-  const tickerPrices = useMemo(() => {
-    const data: Record<string, number> = Object.create(null);
-    tickers?.forEach((item) => {
-      // @ts-ignore
-      data[item.symbol] = item["24h_close"];
-    });
-    return data;
-  }, [tickers]);
-
-  const formatedPositions = useMemo<[API.PositionExt[], any] | null>(() => {
-    if (!data?.rows || symbolInfo.isNil || !accountInfo) return null;
-
-    const filteredData =
-      typeof symbol === "undefined" || symbol === ""
-        ? data.rows
-        : data.rows.filter((item) => {
-            return item.symbol === symbol;
-          });
-
-    let unrealPnL_total = zero,
-      notional_total = zero,
-      unsettlementPnL_total = zero;
-
-    const formatted = filteredData.map((item: API.Position) => {
-      // const price = (markPrices as any)[item.symbol] ?? item.mark_price;
-      const unRealizedPrice = propOr(
-        item.mark_price,
-        item.symbol,
-        priceMode === "markPrice" ? markPrices : tickerPrices
-      ) as unknown as number;
-
-      const price = propOr(
-        item.mark_price,
-        item.symbol,
-        markPrices
-      ) as unknown as number;
-
-      const info = symbolInfo[item.symbol];
-      //
-
-      const notional = positions.notional(item.position_qty, price);
-
-      const unrealPnl = positions.unrealizedPnL({
-        qty: item.position_qty,
-        openPrice: item?.average_open_price,
-        markPrice: unRealizedPrice,
-      });
-
-      const imr = account.IMR({
-        maxLeverage: accountInfo.max_leverage,
-        baseIMR: info("base_imr"),
-        IMR_Factor: accountInfo.imr_factor[item.symbol] as number,
-        positionNotional: notional,
-        ordersNotional: 0,
-        IMR_factor_power: 4 / 5,
-      });
-
-      const unrealPnlROI = positions.unrealizedPnLROI({
-        positionQty: item.position_qty,
-        openPrice: item.average_open_price,
-        IMR: imr,
-        unrealizedPnL: unrealPnl,
-      });
-
-      const unsettlementPnL = positions.unsettlementPnL({
-        positionQty: item.position_qty,
-        markPrice: price,
-        costPosition: item.cost_position,
-        sumUnitaryFunding: fundingRates[item.symbol]?.(
-          "sum_unitary_funding",
-          0
-        ),
-        lastSumUnitaryFunding: item.last_sum_unitary_funding,
-      });
-
-      unrealPnL_total = unrealPnL_total.add(unrealPnl);
-      notional_total = notional_total.add(notional);
-      unsettlementPnL_total = unsettlementPnL_total.add(unsettlementPnL);
-
-      return {
-        ...item,
-        mark_price: price,
-        mm: 0,
-        notional,
-        unsettlement_pnl: unsettlementPnL,
-        unrealized_pnl: unrealPnl,
-        unrealized_pnl_ROI: unrealPnlROI,
-      };
-    });
-
-    return [
-      formatted,
-      {
-        unrealPnL: unrealPnL_total.toNumber(),
-        notional: notional_total.toNumber(),
-        unsettledPnL: unsettlementPnL_total.toNumber(),
-      },
-    ];
-  }, [
-    data?.rows,
-    symbolInfo,
-    accountInfo,
-    markPrices,
-    priceMode,
-    tickerPrices,
-    symbol,
-    holding,
-  ]);
-
-  // const showSymbol = useCallback((symbol: string) => {
-  //   setVisibleSymbol(symbol);
-  // }, []);
-
-  const [totalCollateral, totalValue, totalUnrealizedROI] = useMemo<
-    [Decimal, Decimal, number]
-  >(() => {
-    if (!holding || !markPrices) {
-      return [zero, zero, 0];
+    positionCalculator.current = new PositionCalculator(symbol);
+    for (const scope of scopes) {
+      calculatorService.register(scope, positionCalculator.current);
     }
-    const unsettlemnedPnL = pathOr(0, [1, "unsettledPnL"])(formatedPositions);
-    const unrealizedPnL = pathOr(0, [1, "unrealPnL"])(formatedPositions);
+    return () => {
+      for (const scope of scopes) {
+        calculatorService.unregister(scope, positionCalculator.current!);
+      }
+    };
+  }, [symbol]);
 
-    const [USDC_holding, nonUSDC] = parseHolding(holding, markPrices);
+  const formattedPositions: [
+    API.PositionTPSLExt[] | null,
+    Omit<API.PositionsTPSLExt, "rows">,
+  ] = usePositionStore((state) => {
+    const positions = state.positions[symbol] ?? POSITION_EMPTY;
 
-    const totalCollateral = account.totalCollateral({
-      USDCHolding: USDC_holding,
-      nonUSDCHolding: nonUSDC,
-      unsettlementPnL: unsettlemnedPnL,
-    });
+    // console.log("******", symbol, state.positions);
 
-    const totalValue = account.totalValue({
-      totalUnsettlementPnL: unsettlemnedPnL,
-      USDCHolding: USDC_holding,
-      nonUSDCHolding: nonUSDC,
-    });
+    return [positions.rows, omit(["rows"], positions)];
+  });
 
-    const totalUnrealizedROI = account.totalUnrealizedROI({
-      totalUnrealizedPnL: unrealizedPnL,
-      totalValue: totalValue.toNumber(),
-    });
+  const { totalCollateral, totalValue, totalUnrealizedROI } = useAppStore(
+    (state) => state.portfolio,
+  );
 
-    return [totalCollateral, totalValue, totalUnrealizedROI];
-  }, [holding, formatedPositions, markPrices]);
+  const aggregated = useMemo(() => {
+    const data = formattedPositions[1];
+    if (!data) {
+      return {};
+    }
 
-  const positionsRows = useMemo<API.PositionTPSLExt[] | null>(() => {
-    if (!formatedPositions) return null;
+    if (calcMode === "markPrice") {
+      return data;
+    }
 
-    if (!symbolInfo || !accountInfo) return formatedPositions[0];
+    const { total_unreal_pnl_index, unrealPnlROI_index, ...rest } = data;
 
-    const total = totalCollateral.toNumber();
+    return {
+      ...rest,
+      unrealPnL: total_unreal_pnl_index,
+      total_unreal_pnl: total_unreal_pnl_index,
+      unrealPnlROI: unrealPnlROI_index,
+    };
+  }, [calcMode]);
 
-    let rows = formatedPositions[0];
+  let rows = formattedPositions[0];
+  {
+    // rows
+    if (!rows) {
+      rows = [];
+    }
+
+    // rows.forEach((item) => {
+    //   if (item.position_qty > 0) {
+    //     console.log(markPrices.data[item.symbol], item.mark_price);
+    //   }
+    // });
 
     if (!includedPendingOrder) {
       rows = rows.filter((item) => item.position_qty !== 0);
@@ -263,89 +133,77 @@ export const usePositionStream = (
         (item) =>
           item.position_qty !== 0 ||
           item.pending_long_qty !== 0 ||
-          item.pending_short_qty !== 0
+          item.pending_short_qty !== 0,
       );
     }
-    // .filter((item) => item.position_qty !== 0)
-    rows = rows.map((item) => {
-      const info = symbolInfo?.[item.symbol];
 
-      const related_order = Array.isArray(tpslOrders)
-        ? findPositionTPSLFromOrders(tpslOrders, item.symbol)
-        : undefined;
+    if (calcMode === "lastPrice") {
+      rows = rows.map((item) => {
+        const {
+          unrealized_pnl_index,
+          unrealized_pnl_ROI_index,
 
-      const tp_sl_pricer = !!related_order
-        ? findTPSLFromOrder(related_order)
-        : undefined;
+          ...rust
+        } = item;
 
-      const MMR = positions.MMR({
-        baseMMR: info("base_mmr"),
-        baseIMR: info("base_imr"),
-        IMRFactor: accountInfo.imr_factor[item.symbol] as number,
-        positionNotional: item.notional,
-        IMR_factor_power: 4 / 5,
+        return {
+          ...rust,
+          unrealized_pnl: unrealized_pnl_index ?? 0,
+          unsettled_pnl_ROI: unrealized_pnl_ROI_index ?? 0,
+          // mark_price: item.last_price,
+        };
       });
+    }
 
-      return {
-        ...item,
-        mm: positions.maintenanceMargin({
-          positionQty: item.position_qty,
-          markPrice: item.mark_price,
-          MMR,
-        }),
-        tp_trigger_price: tp_sl_pricer?.tp_trigger_price,
-        sl_trigger_price: tp_sl_pricer?.sl_trigger_price,
+    // console.log("tpslOrders", tpslOrders);
 
-        mmr: MMR,
+    if (Array.isArray(tpslOrders) && tpslOrders.length) {
+      rows = rows.map((item) => {
+        const related_order = findPositionTPSLFromOrders(
+          tpslOrders,
+          item.symbol,
+        );
 
-        // has_position_tp_sl:
-        //   !tp_sl_pricer?.sl_trigger_price && !tp_sl_pricer?.tp_trigger_price,
-        algo_order: related_order,
-      };
-    });
+        const tp_sl_pricer = !!related_order
+          ? findTPSLFromOrder(related_order)
+          : undefined;
 
-    // calculate est_liq_price
-    rows = rows.map((item) => {
-      const est_liq_price = positions.liqPrice({
-        markPrice: item.mark_price,
-        totalCollateral: total,
-        positionQty: item.position_qty,
-        positions: rows,
-        MMR: item.mmr,
+        return {
+          ...item,
+          tp_trigger_price: tp_sl_pricer?.tp_trigger_price,
+          sl_trigger_price: tp_sl_pricer?.sl_trigger_price,
+          algo_order: related_order,
+        };
       });
-      return {
-        ...item,
-        est_liq_price,
-      };
-    });
+    }
+  }
 
-    return rows;
-  }, [formatedPositions, symbolInfo, accountInfo, totalCollateral, tpslOrders]);
-
-  const positionInfoGetter = createGetter<
-    Omit<API.PositionInfo, "rows">,
-    keyof Omit<API.PositionInfo, "rows">
-  >(data as any, 1);
+  const positionInfoGetter = createGetter(
+    aggregated as Omit<API.PositionInfo, "rows">,
+    1,
+  );
 
   return [
     {
-      rows: positionsRows,
-      aggregated: {
-        ...(formatedPositions?.[1] ?? {}),
-        unrealPnlROI: totalUnrealizedROI,
-      },
+      rows,
+      // rows: formattedPositions[0],
+      aggregated: formattedPositions?.[1] ?? {},
       totalCollateral,
       totalValue,
       totalUnrealizedROI,
     },
     positionInfoGetter,
     {
-      // close: onClosePosition,
-      loading: false,
-      // showSymbol,
-      error,
-      // loadMore: () => {},
-      refresh: refreshAlgoAndPosition,
+      /**
+       * @deprecated use `isLoading` instead
+       */
+      loading: positionStatus.loading,
+      isLoading: positionStatus.loading,
+      // isValidating,
+      // // showSymbol,
+      // error,
+      // // loadMore: () => {},
+      // refresh: refreshPositions,
     },
   ] as const;
 };

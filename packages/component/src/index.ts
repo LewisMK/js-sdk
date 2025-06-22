@@ -71,6 +71,7 @@ export {
 
 // ==================== page component ====================
 export * from "./page";
+export type { TradingPageProps } from "./page";
 
 export { Page, Layout } from "./layout";
 
@@ -100,7 +101,7 @@ export {
 export {
   ChainDialog,
   showAccountConnectorModal,
-  DepositAndWithdrawWithDialog,
+  // DepositAndWithdrawWithDialog,
   DepositAndWithdrawWithSheet,
 } from "./block";
 

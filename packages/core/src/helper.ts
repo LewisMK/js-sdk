@@ -1,11 +1,11 @@
 import { definedTypes } from "@orderly.network/types";
 import { LocalStorageStore, MockKeyStore } from "./keyStore";
 import { BaseSigner } from "./signer";
-import { SignatureDomain } from "./utils";
+import { getTimestamp, SignatureDomain } from "./utils";
 
 export const getMockSigner = (secretKey?: string) => {
   const mockKeyStore = new MockKeyStore(
-    secretKey || "AFmQSju4FhDwG93cMdKogcnKx7SWmViDtDv5PVzfvRDF"
+    secretKey || "AFmQSju4FhDwG93cMdKogcnKx7SWmViDtDv5PVzfvRDF",
     // "c24fe227663f5a73493cad3f4049514f70623177272d57fffa8cb895fa1f92de"
   );
 
@@ -50,7 +50,7 @@ export function generateRegisterAccountMessage(inputs: {
     chainId,
     registrationNonce,
     brokerId,
-    timestamp = Date.now(),
+    timestamp = getTimestamp(),
   } = inputs;
   // const now = Date.now();
   const primaryType = "Registration";
@@ -86,6 +86,9 @@ export function generateAddOrderlyKeyMessage(inputs: {
   primaryType: keyof typeof definedTypes;
   expiration?: number;
   timestamp?: number;
+  scope?: string;
+  tag?: string;
+  subAccountId?: string;
 }) {
   const {
     publicKey,
@@ -93,17 +96,22 @@ export function generateAddOrderlyKeyMessage(inputs: {
     primaryType,
     brokerId,
     expiration = 365,
-    timestamp = Date.now(),
+    timestamp = getTimestamp(),
+    scope,
+    tag,
+    subAccountId,
   } = inputs;
   // const now = Date.now();
   // message;
   const message = {
     brokerId,
     orderlyKey: publicKey,
-    scope: "read,trading",
+    scope: scope || "read,trading",
     chainId,
     timestamp,
     expiration: timestamp + 1000 * 60 * 60 * 24 * expiration,
+    ...(typeof tag !== "undefined" ? { tag } : {}),
+    ...(typeof subAccountId !== "undefined" ? { subAccountId } : {}),
   };
 
   const typeDefinition = {
@@ -132,7 +140,7 @@ export function generateSettleMessage(inputs: {
 }) {
   const { chainId, settlePnlNonce, domain, brokerId } = inputs;
   const primaryType = "SettlePnl";
-  const timestamp = new Date().getTime();
+  const timestamp = getTimestamp();
 
   const typeDefinition = {
     EIP712Domain: definedTypes.EIP712Domain,

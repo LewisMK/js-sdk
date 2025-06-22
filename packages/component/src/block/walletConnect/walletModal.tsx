@@ -1,6 +1,6 @@
 import { useContext } from "react";
-import { modal, useModal } from "@/modal";
-import { create } from "@/modal/modalHelper";
+import { modal, useModal } from "@orderly.network/ui";
+// import { create } from "@/modal/modalHelper";
 import { MEDIA_TABLET } from "@orderly.network/types";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/sheet";
 import { toast } from "@/toast";
@@ -15,6 +15,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/dialog";
+import {
+  WalletConnectorModalId,
+  WalletConnectorSheetId,
+} from "@orderly.network/ui-connector";
 
 const useWalletConnect = () => {
   const { visible, hide, resolve, reject, onOpenChange } = useModal();
@@ -47,7 +51,7 @@ const useWalletConnect = () => {
   };
 };
 
-export const WalletConnectSheet = create<WalletConnectProps>((props) => {
+export const WalletConnectSheet = modal.create<WalletConnectProps>((props) => {
   // const { visible, hide, resolve, reject, onOpenChange } = useModal();
   // // get account status and handle sign in and enable trading
   // const { account, createOrderlyKey, createAccount } = useAccount();
@@ -96,7 +100,7 @@ export const WalletConnectSheet = create<WalletConnectProps>((props) => {
   );
 });
 
-export const WalletConnectDialog = create<WalletConnectProps>((props) => {
+export const WalletConnectDialog = modal.create<WalletConnectProps>((props) => {
   const {
     visible,
     hide,
@@ -116,7 +120,12 @@ export const WalletConnectDialog = create<WalletConnectProps>((props) => {
 
   return (
     <Dialog open={visible} onOpenChange={_onOpenChange}>
-      <DialogContent maxWidth={"sm"} closable onOpenAutoFocus={(e) => e.preventDefault()} className="orderly-bg-base-800 desktop:orderly-max-w-[400px] orderly-px-[24px] orderly-py-6">
+      <DialogContent
+        maxWidth={"sm"}
+        closable
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        className="orderly-bg-base-800 desktop:orderly-max-w-[400px] orderly-px-[24px] orderly-py-6"
+      >
         <DialogHeader>
           <DialogTitle>Connect wallet</DialogTitle>
         </DialogHeader>
@@ -136,8 +145,9 @@ export const WalletConnectDialog = create<WalletConnectProps>((props) => {
 export const showAccountConnectorModal = async (props: WalletConnectProps) => {
   const matches = window.matchMedia(MEDIA_TABLET).matches;
   if (matches) {
-    return await modal.show(WalletConnectSheet, props);
+    // return await modal.show(WalletConnectSheet, props);
+    await modal.show(WalletConnectorSheetId, props);
   } else {
-    return await modal.show(WalletConnectDialog, props);
+    return await modal.show(WalletConnectorModalId, props);
   }
 };

@@ -25,7 +25,7 @@ import Button from "@/button";
 import { NetworkImage } from "@/icon";
 import { AccountStatusEnum } from "@orderly.network/types";
 import { WalletConnectSheet } from "@/block/walletConnect";
-import { modal } from "@/modal";
+import { modal } from "@orderly.network/ui";
 import { isTestnet } from "@orderly.network/utils";
 
 interface AssetsProps {
@@ -72,7 +72,7 @@ export const Assets: FC<AssetsProps> = (props) => {
     }
     setDisableGetTestUSDC(true);
     return getTestUSDC({
-      chain_id: account.wallet?.chainId.toString(),
+      chain_id: account.walletAdapter?.chainId.toString(),
       user_address: state.address,
       broker_id: config.get("brokerId"),
     }).then(

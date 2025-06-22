@@ -1,7 +1,11 @@
-import { useModal } from "@/modal";
-import { create } from "@/modal/modalHelper";
-import { Sheet, SheetContent, SheetHeader } from "@/sheet/sheet";
-import { Dialog, DialogContent } from "@/dialog/dialog";
+import {
+  FC,
+  PropsWithChildren,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   useAccountInfo,
   useLeverage,
@@ -11,26 +15,26 @@ import {
   useSymbolsInfo,
 } from "@orderly.network/hooks";
 import { MEDIA_TABLET } from "@orderly.network/types";
-import {
-  FC,
-  PropsWithChildren,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useModal, modal } from "@orderly.network/ui";
+import { Dialog, DialogContent } from "@/dialog/dialog";
+import { useTradingPageContext } from "@/page/trading/context/tradingPageContext";
+import { OrderlyAppContext } from "@/provider";
+// import { create } from "@/modal/modalHelper";
+import { Sheet, SheetContent, SheetHeader } from "@/sheet/sheet";
 import { DesktopSharePnLContent } from "./desktopSharePnl";
 import { MobileSharePnLContent } from "./mobileSharePnl";
-import { OrderlyAppContext } from "@/provider";
+import { ShareConfigProps } from "./shareConfigProps";
 import { ReferralType } from "./sharePnLUtils";
 
-export const SharePoisitionView = create<{
+export const SharePoisitionView = modal.create<{
   position: any;
-  leverage: any,
+  leverage: any;
+  shareOptions: any;
+  referral: any;
 }>((props) => {
   const isTablet = useMediaQuery(MEDIA_TABLET);
-  const { position } = props;
-  // const [leverage] = useLeverage();
+  const { position, shareOptions, referral } = props;
+
   const symbolInfo = useSymbolsInfo();
   // const { data: info } = useAccountInfo();
 
@@ -55,14 +59,13 @@ export const SharePoisitionView = create<{
   //   return Math.min(maxAccountLeverage, maxSymbolLeverage);
   // }, [maxAccountLeverage, maxSymbolLeverage]);
 
-
   const { getFirstRefCode } = useReferralInfo();
 
   if (symbolInfo.isNil) return null;
 
   const base_dp = symbolInfo[position.symbol]("base_dp");
   const quote_dp = symbolInfo[position.symbol]("quote_dp");
-  const { referral } = useContext(OrderlyAppContext);
+  // const { referral } = useTradingPageContext();
 
   const referralInfo = useMemo((): ReferralType | undefined => {
     const code = getFirstRefCode()?.code;
@@ -70,13 +73,10 @@ export const SharePoisitionView = create<{
       code,
       slogan: referral?.slogan,
       link: referral?.refLink,
-    }
+    };
 
     return info;
-
-  }, [
-    getFirstRefCode, referral,
-  ]);
+  }, [getFirstRefCode, referral]);
 
   return isTablet ? (
     <MobileSharePnL
@@ -85,6 +85,7 @@ export const SharePoisitionView = create<{
       baseDp={base_dp}
       quoteDp={quote_dp}
       referral={referralInfo}
+      shareOptions={shareOptions}
     />
   ) : (
     <DesktopSharePnL
@@ -93,6 +94,7 @@ export const SharePoisitionView = create<{
       baseDp={base_dp}
       quoteDp={quote_dp}
       referral={referralInfo}
+      shareOptions={shareOptions}
     />
   );
 });
@@ -105,9 +107,10 @@ const MobileSharePnL: FC<
     baseDp?: number;
     quoteDp?: number;
     referral?: ReferralType;
+    shareOptions: ShareConfigProps;
   }>
 > = (props) => {
-  const { leverage, position, baseDp, quoteDp, referral } = props;
+  const { leverage, position, baseDp, quoteDp, referral, shareOptions } = props;
   const { visible, hide, resolve, reject, onOpenChange } = useModal();
 
   return (
@@ -131,6 +134,7 @@ const MobileSharePnL: FC<
           baseDp={baseDp}
           quoteDp={quoteDp}
           referral={referral}
+          shareOptions={shareOptions}
         />
       </SheetContent>
     </Sheet>
@@ -145,13 +149,14 @@ const DesktopSharePnL: FC<
     baseDp?: number;
     quoteDp?: number;
     referral?: ReferralType;
+    shareOptions: ShareConfigProps;
   }>
 > = (props) => {
-  const { leverage, position, baseDp, quoteDp, referral } = props;
+  const { leverage, position, baseDp, quoteDp, referral, shareOptions } = props;
   const { visible, hide, resolve, reject, onOpenChange } = useModal();
 
   const [viewportHeight, setViewportHeight] = useState(
-    window.innerHeight < 900 ? 660 : 807
+    window.innerHeight < 900 ? 660 : 807,
   );
 
   useEffect(() => {
@@ -186,6 +191,7 @@ const DesktopSharePnL: FC<
             baseDp={baseDp}
             quoteDp={quoteDp}
             referral={referral}
+            shareOptions={shareOptions}
           />
         </div>
       </DialogContent>

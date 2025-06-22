@@ -23,8 +23,10 @@ import {
   useLocalStorage,
   useDebounce,
   useMediaQuery,
+  useDebouncedCallback,
 } from "@orderly.network/hooks";
 import { UseOrderEntryMetaState, utils } from "@orderly.network/hooks";
+import { AuthGuard } from "@orderly.network/ui-connector";
 
 import {
   API,
@@ -33,8 +35,10 @@ import {
   OrderSide,
   OrderType,
 } from "@orderly.network/types";
-import { modal } from "@/modal";
+// import { modal } from "@orderly.network/ui";
+import { modal } from "@orderly.network/ui";
 import {
+  OrderConfirmCheckBox,
   OrderConfirmFooter,
   OrderConfirmView,
 } from "./sections/orderConfirmView.new";
@@ -45,8 +49,6 @@ import { cn } from "@/utils/css";
 import { convertValueToPercentage } from "@/slider/utils";
 import { FreeCollat } from "./sections/freeCollat";
 import { EstInfo } from "./sections/setInfo";
-import { ApiError } from "@orderly.network/types";
-import { StatusGuardButton } from "../accountStatus";
 
 export interface OrderEntryProps {
   onSubmit?: (data: any) => Promise<any>;
@@ -146,6 +148,8 @@ export const OrderEntry = forwardRef<OrderEntryRef, OrderEntryProps>(
     const isMarketOrder = [OrderType.MARKET, OrderType.STOP_MARKET].includes(
       formattedOrder.order_type || OrderType.LIMIT
     );
+
+    const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
       // handle orderbook item click event
@@ -256,6 +260,8 @@ export const OrderEntry = forwardRef<OrderEntryRef, OrderEntryProps>(
       //
       event.preventDefault();
 
+      if (submitting) return;
+      setSubmitting(true);
       if (!symbolConfig) {
         return Promise.reject("symbolConfig is null");
       }
@@ -274,10 +280,11 @@ export const OrderEntry = forwardRef<OrderEntryRef, OrderEntryProps>(
           formatQty();
           if (needConfirm) {
             return modal.confirm({
-              maxWidth: "sm",
+              // maxWidth: "sm",
               title: "Confirm Order",
-              okId: "orderly-confirm-order-dialog-confirm",
-              cancelId: "orderly-confirm-order-dialog-cancel",
+              bodyClassName: "!orderly-pb-0",
+              // okId: "orderly-confirm-order-dialog-confirm",
+              // cancelId: "orderly-confirm-order-dialog-cancel",
               onCancel: () => {
                 return Promise.reject("cancel");
               },
@@ -292,17 +299,24 @@ export const OrderEntry = forwardRef<OrderEntryRef, OrderEntryProps>(
                 />
               ) : undefined,
               content: (
-                <OrderConfirmView
-                  order={{
-                    ...(formattedOrder as OrderEntity),
-                    side: side!,
-                    symbol: props.symbol,
-                  }}
-                  symbol={symbol}
-                  base={symbolConfig?.base}
-                  quote={symbolConfig?.quote}
-                  isTable={isTablet}
-                />
+                <>
+                  <OrderConfirmView
+                    order={{
+                      ...(formattedOrder as OrderEntity),
+                      side: side!,
+                      symbol: props.symbol,
+                    }}
+                    symbol={symbol}
+                    base={symbolConfig?.base}
+                    quote={symbolConfig?.quote}
+                    isTable={isTablet}
+                  />
+                  {!isTablet ? (
+                    <div className="orderly-flex-1 orderly-items-center orderly-h-[32px]">
+                      <OrderConfirmCheckBox className="orderly-pt-[6px]" />
+                    </div>
+                  ) : null}
+                </>
               ),
             });
           } else {
@@ -312,12 +326,12 @@ export const OrderEntry = forwardRef<OrderEntryRef, OrderEntryProps>(
         .then((isOk) => {
           return props.submit().then(
             (res) => {
-              // props.setValues({
-              //   trigger_price: "",
-              //   order_price: "",
-              //   order_quantity: "",
-              //   total: "",
-              // });
+              props.setValues({
+                // trigger_price: "",
+                // order_price: "",
+                order_quantity: "",
+                // total: "",
+              });
               // resetForm?.();
             },
             (err) => {
@@ -336,9 +350,11 @@ export const OrderEntry = forwardRef<OrderEntryRef, OrderEntryProps>(
           if (error !== "cancel" && !!error?.message) {
             toast.error(error.message || "Failed");
           }
+        }).finally(() => {
+          setSubmitting(false);
         });
     };
-
+    
     const onDeposit = useCallback((event: FormEvent) => {
       event.preventDefault();
       props.onDeposit?.();
@@ -676,7 +692,11 @@ export const OrderEntry = forwardRef<OrderEntryRef, OrderEntryProps>(
             reduceOnly={formattedOrder.reduce_only}
             onFieldChange={props.onFieldChange}
           />
-          <StatusGuardButton id="orderly-order-entry-status-guard-button">
+          <AuthGuard
+            // @ts-ignore
+            id="orderly-order-entry-status-guard-button"
+            buttonProps={{ size: "lg", fullWidth: true }}
+          >
             <Button
               id="orderly-order-entry-confirm-button"
               className="orderly-text-xs desktop:orderly-font-bold desktop:orderly-text-sm"
@@ -687,7 +707,7 @@ export const OrderEntry = forwardRef<OrderEntryRef, OrderEntryProps>(
             >
               {buttonText}
             </Button>
-          </StatusGuardButton>
+          </AuthGuard>
         </div>
       </form>
     );

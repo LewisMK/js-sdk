@@ -1,4 +1,3 @@
-import { modal } from "@/modal";
 import { FC, PropsWithChildren, createContext, useCallback } from "react";
 import {
   useAccountInstance,
@@ -8,13 +7,14 @@ import {
   useEventEmitter,
   useMediaQuery,
 } from "@orderly.network/hooks";
-import { toast } from "@/toast";
-import {
-  DepositAndWithdrawWithDialog,
-  DepositAndWithdrawWithSheet,
-} from "@/block/depositAndwithdraw/depositAndwithdraw";
 import { capitalizeString } from "@orderly.network/utils";
 import { MEDIA_TABLET } from "@orderly.network/types";
+
+import { modal, toast } from "@orderly.network/ui";
+import {
+  DepositAndWithdrawWithDialogId,
+  DepositAndWithdrawWithSheetId,
+} from "@orderly.network/ui-transfer";
 
 export interface AssetsContextState {
   onDeposit: () => Promise<any>;
@@ -36,12 +36,18 @@ export const AssetsProvider: FC<PropsWithChildren> = (props) => {
   const openDepositAndWithdraw = useCallback(
     async (viewName: "deposit" | "withdraw") => {
       let result;
+      // result = await modal.show("DepositAndWithdrawWithDialogId", {
+      //   activeTab: viewName,
+      // });
+      // result = await modal.show(DepositAndWithdrawWithDialogId, {
+      //   activeTab: viewName,
+      // });
       if (matches) {
-        result = await modal.show(DepositAndWithdrawWithSheet, {
+        result = await modal.show(DepositAndWithdrawWithSheetId, {
           activeTab: viewName,
         });
       } else {
-        result = await modal.show(DepositAndWithdrawWithDialog, {
+        result = await modal.show(DepositAndWithdrawWithDialogId, {
           activeTab: viewName,
         });
       }

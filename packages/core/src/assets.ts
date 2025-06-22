@@ -1,29 +1,30 @@
-import { ethers } from "ethers";
+import {
+  ABSTRACT_CHAIN_ID_MAP,
+  ABSTRACT_TESTNET_CHAINID,
+  API,
+  ApiError,
+  BSC_TESTNET_CHAINID,
+  ChainNamespace,
+  MaxUint256,
+  MONAD_TESTNET_CHAINID,
+  STORY_TESTNET_CHAINID,
+} from "@orderly.network/types";
 import { Account } from "./account";
 import { ConfigStore } from "./configStore/configStore";
-
 import { IContract } from "./contract";
 import { MessageFactor } from "./signer";
 import {
-  SignatureDomain,
   formatByUnits,
   getTimestamp,
-  parseAccountId,
   parseBrokerHash,
   parseTokenHash,
 } from "./utils";
-import {
-  API,
-  ApiError,
-  MaxUint256,
-  definedTypes,
-} from "@orderly.network/types";
 
 export class Assets {
   constructor(
     private readonly configStore: ConfigStore,
     private readonly contractManger: IContract,
-    private readonly account: Account
+    private readonly account: Account,
   ) {}
 
   async withdraw(inputs: {
@@ -31,37 +32,66 @@ export class Assets {
     token: string;
     amount: string | number;
     allowCrossChainWithdraw: boolean;
+    /** orderly withdraw decimals */
+    decimals: number;
   }) {
-    if (!this.account.walletClient) {
-      throw new Error("walletClient is undefined");
+    if (!this.account.walletAdapter) {
+      throw new Error("walletAdapter is undefined");
     }
-    if (!this.account.stateValue.address)
-      throw new Error("account address is rqeuired");
+    if (!this.account.stateValue.address) {
+      throw new Error("account address is required");
+    }
 
-    const { chainId, token, allowCrossChainWithdraw } = inputs;
+    const { chainId, token, allowCrossChainWithdraw, decimals } = inputs;
     let { amount } = inputs;
     if (typeof amount === "number") {
       amount = amount.toString();
     }
-    const url = "/v1/withdraw_request";
-    // get withdrawl nonce
-    const nonce = await this.getWithdrawalNonce();
-    const domain = this.account.getDomain(true);
-    const [message, toSignatureMessage] = this._generateWithdrawMessage({
-      chainId,
-      receiver: this.account.stateValue.address!,
-      token,
-      amount: this.account.walletClient.parseUnits(amount),
-      nonce,
-      domain,
-    });
 
-    const EIP_712signatured = await this.account.signTypedData(
-      toSignatureMessage
-    );
+    if (decimals === undefined || decimals === null) {
+      throw new Error("decimals is required");
+    }
+
+    const url = "/v1/withdraw_request";
+    // get withdrawal nonce
+    const nonce = await this.getWithdrawalNonce();
+    const timestamp = getTimestamp();
+    // const domain = this.account.getDomain(true);
+    // const [message, toSignatureMessage] = this._generateWithdrawMessage({
+    //   chainId,
+    //   receiver: this.account.stateValue.address!,
+    //   token,
+    //   amount: this.account.walletClient.parseUnits(amount),
+    //   nonce,
+    //   domain,
+    // });
+
+    // const EIP_712signatured = await this.account.signTypedData(
+    //   toSignatureMessage
+    // );
+    const messageData = {
+      receiver: this.account.stateValue.address,
+      token,
+      brokerId: this.configStore.get("brokerId"),
+      amount: this.account.walletAdapter.parseUnits(amount, decimals),
+      nonce,
+      timestamp,
+      // domain,
+      verifyContract:
+        this.contractManger.getContractInfoByEnv().verifyContractAddress,
+    };
+
+    const agwGobalAddress = this.account.getAdditionalInfo()?.AGWAddress ?? "";
+
+    if (ABSTRACT_CHAIN_ID_MAP.has(chainId) && agwGobalAddress) {
+      messageData.receiver = agwGobalAddress;
+    }
+
+    const { message, signatured, domain } =
+      await this.account.walletAdapter.generateWithdrawMessage(messageData);
 
     const data = {
-      signature: EIP_712signatured,
+      signature: signatured,
       message,
       userAddress: this.account.stateValue.address,
       verifyingContract: domain.verifyingContract,
@@ -84,8 +114,6 @@ export class Assets {
 
     const signature = await this.account.signer.sign(payload, getTimestamp());
 
-    //
-
     const res = await this._simpleFetch(url, {
       method: "POST",
       body: JSON.stringify(data),
@@ -104,45 +132,8 @@ export class Assets {
     return res;
   }
 
-  private _generateWithdrawMessage(inputs: {
-    chainId: number;
-    receiver: string;
-    token: string;
-    amount: string;
-    nonce: number;
-    domain: SignatureDomain;
-  }) {
-    const { chainId, receiver, token, amount, domain, nonce } = inputs;
-    const primaryType = "Withdraw";
-    const timestamp = Date.now();
-
-    const typeDefinition = {
-      EIP712Domain: definedTypes.EIP712Domain,
-      [primaryType]: definedTypes[primaryType],
-    };
-
-    const message = {
-      brokerId: this.configStore.get("brokerId"),
-      chainId,
-      receiver,
-      token,
-      amount,
-      timestamp,
-      withdrawNonce: nonce,
-    };
-
-    const toSignatureMessage = {
-      domain,
-      message,
-      primaryType,
-      types: typeDefinition,
-    };
-
-    return [message, toSignatureMessage];
-  }
-
   private async getWithdrawalNonce(): Promise<number> {
-    const timestamp = Date.now().toString();
+    const timestamp = getTimestamp().toString();
     const url = "/v1/withdraw_nonce";
     const message = [timestamp, "GET", url].join("");
 
@@ -167,9 +158,10 @@ export class Assets {
   }
 
   async getNativeBalance(options?: { decimals?: number }): Promise<string> {
-    const result = await this.account.walletClient?.getBalance(
-      this.account.stateValue.address!
-    );
+    if (!this.account.walletAdapter) {
+      return "0";
+    }
+    const result = await this.account.walletAdapter.getBalance();
 
     // return this.account.walletClient!.formatUnits(result);
     return formatByUnits(result, options?.decimals);
@@ -179,158 +171,359 @@ export class Assets {
     address?: string,
     options?: {
       decimals?: number;
-    }
+    },
   ): Promise<string> {
-    if (!this.account.walletClient) {
+    if (!this.account.walletAdapter) {
       return "0";
     }
     const contractAddress = this.contractManger.getContractInfoByEnv();
 
-    const result = await this.account.walletClient?.call(
-      address ?? contractAddress.usdcAddress,
+    let usdcAddress = address ?? contractAddress.usdcAddress;
+    let userAddress = this.account.stateValue.address;
+    if (ABSTRACT_CHAIN_ID_MAP.has(this.account.walletAdapter.chainId)) {
+      usdcAddress = contractAddress.abstractUSDCAddress ?? "";
+    }
+    const agwGobalAddress = this.account.getAdditionalInfo()?.AGWAddress ?? "";
+    if (
+      ABSTRACT_CHAIN_ID_MAP.has(this.account.walletAdapter.chainId) &&
+      agwGobalAddress
+    ) {
+      userAddress = agwGobalAddress;
+    }
+    const result = await this.account.walletAdapter?.call(
+      usdcAddress,
       "balanceOf",
-      [this.account.stateValue.address],
+      [userAddress],
       {
         abi: contractAddress.usdcAbi,
-      }
+      },
     );
 
-    return formatByUnits(result, options?.decimals);
-    // return this.account.walletClient?.formatUnits(result,options?.decimals);
+    // return formatByUnits(result, options?.decimals);
+    return this.account.walletAdapter?.formatUnits(result, options?.decimals!);
   }
 
-  async getBalanceByAddress(address: string): Promise<string> {
-    if (!this.account.walletClient) {
+  async getBalanceByAddress(
+    address: string,
+    options?: {
+      decimals?: number;
+    },
+  ): Promise<string> {
+    if (!this.account.walletAdapter) {
       return "0";
     }
     const contractAddress = this.contractManger.getContractInfoByEnv();
 
-    //
-
-    const result = await this.account.walletClient?.call(
+    const result = await this.account.walletAdapter?.call(
       address,
       "balanceOf",
       [this.account.stateValue.address],
       {
         abi: contractAddress.erc20Abi,
-      }
+      },
     );
-
-    return this.account.walletClient?.formatUnits(result);
+    return formatByUnits(result, options?.decimals);
+    // return this.account.walletClient?.formatUnits(result);
   }
 
-  async getAllowance(address?: string, vaultAddress?: string) {
-    if (!this.account.walletClient) {
+  // async getAllowance(address?: string, vaultAddress?: string) {
+  async getAllowance(
+    /** please use object inputs instead, string inputs will be removed in the future */
+    inputs?:
+      | string
+      | {
+          address?: string;
+          vaultAddress?: string;
+          decimals?: number;
+        },
+    /** @deprecated use inputs.vaultAddress instead, will be removed in the future */
+    _vaultAddress?: string,
+  ) {
+    const { address, vaultAddress, decimals } =
+      typeof inputs === "object"
+        ? inputs
+        : {
+            address: inputs,
+            vaultAddress: _vaultAddress,
+            decimals: undefined,
+          };
+
+    if (!this.account.walletAdapter) {
       return "0";
     }
+    console.log("xxx get allowance before", {
+      address,
+      vaultAddress,
+      decimals,
+    });
+    let userAddress = this.account.stateValue.address;
     const contractAddress = this.contractManger.getContractInfoByEnv();
-    const result = await this.account.walletClient?.call(
-      address ?? contractAddress.usdcAddress,
+    let tempVaultAddress = vaultAddress ?? contractAddress.vaultAddress;
+    let tempUSDCAddress = address;
+    if (this.account.walletAdapter.chainId === STORY_TESTNET_CHAINID) {
+      tempVaultAddress = contractAddress.storyTestnetVaultAddress ?? "";
+    }
+    if (this.account.walletAdapter.chainId === MONAD_TESTNET_CHAINID) {
+      tempVaultAddress = contractAddress.monadTestnetVaultAddress ?? "";
+      tempUSDCAddress = contractAddress.monadTestnetUSDCAddress;
+    }
+    if (ABSTRACT_CHAIN_ID_MAP.has(this.account.walletAdapter.chainId)) {
+      tempVaultAddress = contractAddress.abstractVaultAddress ?? "";
+      tempUSDCAddress = contractAddress.abstractUSDCAddress ?? "";
+    }
+    if (this.account.walletAdapter.chainId === BSC_TESTNET_CHAINID) {
+      tempVaultAddress = contractAddress.bscVaultAddress ?? "";
+      tempUSDCAddress = contractAddress.bscUSDCAddress ?? "";
+    }
+    const agwGobalAddress = this.account.getAdditionalInfo()?.AGWAddress ?? "";
+    if (
+      ABSTRACT_CHAIN_ID_MAP.has(this.account.walletAdapter.chainId) &&
+      agwGobalAddress
+    ) {
+      userAddress = agwGobalAddress;
+    }
+
+    console.log("xxx get allowance", {
+      tempUSDCAddress,
+      tempVaultAddress,
+      userAddress,
+    });
+
+    const result = await this.account.walletAdapter?.call(
+      tempUSDCAddress ?? "",
       "allowance",
-      [
-        this.account.stateValue.address,
-        vaultAddress || contractAddress.vaultAddress,
-      ],
+      [userAddress, tempVaultAddress],
       {
         abi: contractAddress.usdcAbi,
-      }
+      },
     );
 
-    return this.account.walletClient?.formatUnits(result);
+    return this.account.walletAdapter?.formatUnits(result, decimals!);
+    // return result;
   }
 
-  async approve(address?: string, amount?: string, vaultAddress?: string) {
+  async approve(
+    /** please use object inputs instead, string inputs will be removed in the future */
+    inputs:
+      | string
+      | {
+          address?: string;
+          amount?: string;
+          vaultAddress?: string;
+          decimals: number;
+        },
+    /** @deprecated use inputs.amount instead, will be removed in the future */
+    _amount?: string,
+    /** @deprecated use inputs.vaultAddress instead, will be removed in the future */
+    _vaultAddress?: string,
+  ) {
+    const { address, amount, vaultAddress, decimals } =
+      typeof inputs === "object"
+        ? inputs
+        : {
+            address: inputs,
+            amount: _amount,
+            vaultAddress: _vaultAddress,
+            decimals: undefined,
+          };
+
     if (!address) {
       throw new Error("address is required");
     }
 
-    if (!this.account.walletClient) {
-      throw new Error("walletClient is undefined");
+    if (!this.account.walletAdapter) {
+      throw new Error("walletAdapter is undefined");
     }
+
+    if (decimals === undefined || decimals === null) {
+      throw new Error("decimals is required");
+    }
+
     const contractAddress = this.contractManger.getContractInfoByEnv();
     const parsedAmount =
-        typeof amount !== "undefined" && amount !== ""
-            ? this.account.walletClient.parseUnits(amount)
-            : MaxUint256.toString();
+      typeof amount !== "undefined" && amount !== ""
+        ? this.account.walletAdapter.parseUnits(amount, decimals!)
+        : MaxUint256.toString();
 
-    const result = await this.account.walletClient?.call(
-      // contractAddress.usdcAddress,
-      address,
+    let tempVaultAddress = vaultAddress || contractAddress.vaultAddress;
+    let tempUSDCAddress = address;
+    if (this.account.walletAdapter.chainId === STORY_TESTNET_CHAINID) {
+      tempVaultAddress = contractAddress.storyTestnetVaultAddress ?? "";
+    }
+    if (this.account.walletAdapter.chainId === MONAD_TESTNET_CHAINID) {
+      tempVaultAddress = contractAddress.monadTestnetVaultAddress ?? "";
+      tempUSDCAddress = contractAddress.monadTestnetUSDCAddress ?? "";
+    }
+    if (ABSTRACT_CHAIN_ID_MAP.has(this.account.walletAdapter.chainId)) {
+      tempVaultAddress = contractAddress.abstractVaultAddress ?? "";
+    }
+    if (this.account.walletAdapter.chainId === BSC_TESTNET_CHAINID) {
+      tempVaultAddress = contractAddress.bscVaultAddress ?? "";
+      tempUSDCAddress = contractAddress.bscUSDCAddress ?? "";
+    }
+    console.log("xxx approve", {
+      tempVaultAddress,
+      tempUSDCAddress,
+      parsedAmount,
+    });
+
+    const result = await this.account.walletAdapter?.call(
+      tempUSDCAddress,
       "approve",
-      [vaultAddress || contractAddress.vaultAddress, parsedAmount],
+      [tempVaultAddress, parsedAmount],
       {
         abi: contractAddress.usdcAbi,
-      }
+      },
     );
-
     return result;
   }
 
-  async approveByAddress(inputs: { amount?: string; address: string }) {
-    const { amount, address } = inputs;
+  async approveByAddress(inputs: {
+    address: string;
+    amount?: string;
+    decimals: number;
+  }) {
+    const { address, amount, decimals } = inputs;
 
-    return this._approve(address, amount);
-  }
-
-  private async _approve(contractAddress: string, amount?: string) {
-    if (!this.account.walletClient) {
-      throw new Error("walletClient is undefined");
+    if (!this.account.walletAdapter) {
+      throw new Error("walletAdapter is undefined");
     }
+
+    if (decimals === undefined || decimals === null) {
+      throw new Error("decimals is required");
+    }
+
     const parsedAmount =
       typeof amount !== "undefined" && amount !== ""
-        ? this.account.walletClient.parseUnits(amount)
+        ? this.account.walletAdapter.parseUnits(amount, decimals)
         : MaxUint256.toString();
     const orderlyContractAddress = this.contractManger.getContractInfoByEnv();
-    const result = await this.account.walletClient?.call(
-      contractAddress,
+    const result = await this.account.walletAdapter?.call(
+      address,
       "approve",
       [orderlyContractAddress.vaultAddress, parsedAmount],
       {
         abi: orderlyContractAddress.erc20Abi,
-      }
+      },
     );
 
     return result;
   }
 
-  getDepositData(amount: string) {
-    if (!this.account.walletClient)
-      throw new Error("walletClient is undefined");
+  async getDepositFee(
+    /** please use object inputs instead, string inputs will be removed in the future */
+    inputs:
+      | string
+      | {
+          amount: string;
+          chain: API.NetworkInfos;
+          decimals: number;
+        },
+    /** @deprecated use inputs.chain instead, will be removed in the future */
+    _chain?: API.NetworkInfos,
+  ) {
+    const { amount, chain, decimals } =
+      typeof inputs === "object"
+        ? inputs
+        : {
+            amount: inputs,
+            chain: _chain!,
+            decimals: undefined,
+          };
+
+    if (!this.account.walletAdapter) {
+      throw new Error("walletAdapter is undefined");
+    }
+
+    if (decimals === undefined || decimals === null) {
+      throw new Error("decimals is required");
+    }
 
     const brokerId = this.configStore.get<string>("brokerId");
 
     if (!brokerId) throw new Error("[Assets]:brokerId is required");
 
-    return {
+    const depositData: {
+      accountId?: string;
+      brokerHash: string;
+      tokenHash: string;
+      tokenAmount: string;
+      USDCAddress?: string;
+    } = {
       accountId: this.account.accountIdHashStr,
       brokerHash: parseBrokerHash(brokerId!),
       tokenHash: parseTokenHash("USDC"),
-      tokenAmount: this.account.walletClient?.parseUnits(amount),
+      tokenAmount: this.account.walletAdapter?.parseUnits(amount, decimals!),
     };
-  }
-
-  async getDepositFee(amount: string, chain: API.NetworkInfos) {
-    if (!this.account.walletClient)
-      throw new Error("walletClient is undefined");
-
-    const depositData = this.getDepositData(amount);
-
     const contractAddress = this.contractManger.getContractInfoByEnv();
+    const userAddress = this.account.stateValue.address;
+    let vaultAddress = contractAddress.vaultAddress;
+    if (this.account.walletAdapter.chainNamespace === ChainNamespace.solana) {
+      vaultAddress = contractAddress.solanaVaultAddress;
+      // @ts-ignore
+      depositData["USDCAddress"] = contractAddress.solanaUSDCAddress;
+    }
+    if (chain.chain_id === STORY_TESTNET_CHAINID) {
+      vaultAddress = contractAddress.storyTestnetVaultAddress ?? "";
+    }
+    if (chain.chain_id === MONAD_TESTNET_CHAINID) {
+      vaultAddress = contractAddress.monadTestnetVaultAddress ?? "";
+      // depositData["USDCAddress"] = contractAddress.monadTestnetUSDCAddress ?? "";
+    }
+    if (chain.chain_id === BSC_TESTNET_CHAINID) {
+      vaultAddress = contractAddress.bscVaultAddress ?? "";
+    }
+    if (ABSTRACT_CHAIN_ID_MAP.has(this.account.walletAdapter.chainId)) {
+      vaultAddress = contractAddress.abstractVaultAddress ?? "";
+    }
 
-    return await this.account.walletClient.callOnChain(
+    console.log("xxx get deposit fee", {
+      userAddress,
+      vaultAddress,
+      depositData,
+    });
+    return await this.account.walletAdapter.callOnChain(
       chain,
-      contractAddress.vaultAddress,
+      vaultAddress,
       "getDepositFee",
-      [this.account.stateValue.address, depositData],
+      [userAddress, depositData],
       {
         abi: contractAddress.vaultAbi,
-      }
+      },
     );
   }
 
-  async deposit(amount: string, fee: bigint = 0n) {
-    if (!this.account.walletClient)
-      throw new Error("walletClient is undefined");
+  async deposit(
+    /** please use object inputs instead */
+    inputs:
+      | string
+      | {
+          amount: string;
+          fee: bigint;
+          decimals: number;
+        },
+    /** @deprecated use inputs.fee instead, will be removed in the future */
+    _fee?: bigint,
+  ) {
+    const {
+      amount,
+      fee = 0n,
+      decimals,
+    } = typeof inputs === "object"
+      ? inputs
+      : {
+          amount: inputs,
+          fee: _fee,
+          decimals: undefined,
+        };
+
+    if (!this.account.walletAdapter) {
+      throw new Error("walletAdapter is undefined");
+    }
+
+    if (decimals === undefined || decimals === null) {
+      throw new Error("decimals is required");
+    }
 
     const brokerId = this.configStore.get<string>("brokerId");
 
@@ -338,35 +531,75 @@ export class Assets {
 
     const contractAddress = this.contractManger.getContractInfoByEnv();
 
-    const depositData = {
+    const depositData: {
+      accountId?: string;
+      brokerHash: string;
+      tokenHash: string;
+      tokenAmount: string;
+      USDCAddress?: string;
+    } = {
       accountId: this.account.accountIdHashStr,
       brokerHash: parseBrokerHash(brokerId!),
       tokenHash: parseTokenHash("USDC"),
-      tokenAmount: this.account.walletClient?.parseUnits(amount),
+      tokenAmount: this.account.walletAdapter?.parseUnits(amount, decimals),
     };
 
-    // --- call deposit
-    // const result = await this.account.walletClient?.call(
-    //   contractAddress.vaultAddress,
-    //   "deposit",
-    //   [depositData],
-    //   {
-    //     abi: contractAddress.vaultAbi,
-    //   }
-    // );
+    let vaultAddress = contractAddress.vaultAddress;
+    const userAddress = this.account.stateValue.address;
+    if (this.account.walletAdapter.chainNamespace === ChainNamespace.solana) {
+      vaultAddress = contractAddress.solanaVaultAddress;
+      // @ts-ignore
+      depositData["USDCAddress"] = contractAddress.solanaUSDCAddress;
+    }
+    if (this.account.walletAdapter.chainId === STORY_TESTNET_CHAINID) {
+      vaultAddress = contractAddress.storyTestnetVaultAddress ?? "";
+    }
+    if (this.account.walletAdapter.chainId === MONAD_TESTNET_CHAINID) {
+      vaultAddress = contractAddress.monadTestnetVaultAddress ?? "";
+    }
+    if (ABSTRACT_CHAIN_ID_MAP.has(this.account.walletAdapter.chainId)) {
+      vaultAddress = contractAddress.abstractVaultAddress ?? "";
+    }
+    if (this.account.walletAdapter.chainId === BSC_TESTNET_CHAINID) {
+      vaultAddress = contractAddress.bscVaultAddress ?? "";
+    }
+    const agwGobalAddress = this.account.getAdditionalInfo()?.AGWAddress ?? "";
 
-    const result = await this.account.walletClient?.sendTransaction(
-      contractAddress.vaultAddress,
-      "deposit",
+    let contractMethod = "deposit";
+    let fromAddress = userAddress;
+    let contractData: any = [depositData];
+
+    if (
+      ABSTRACT_CHAIN_ID_MAP.has(this.account.walletAdapter.chainId) &&
+      agwGobalAddress
+    ) {
+      console.log(
+        "agw address",
+        agwGobalAddress,
+        this.account.walletAdapter.chainId,
+      );
+      contractMethod = "depositTo";
+      fromAddress = agwGobalAddress;
+      contractData = [userAddress, depositData];
+    }
+    console.log("xxx deposit", {
+      vaultAddress,
+      fromAddress,
+      contractMethod,
+      contractData,
+    });
+    const result = await this.account.walletAdapter?.sendTransaction(
+      vaultAddress,
+      contractMethod,
       {
-        from: this.account.stateValue.address!,
-        to: contractAddress.vaultAddress,
-        data: [depositData],
+        from: fromAddress!,
+        to: vaultAddress,
+        data: contractData,
         value: fee,
       },
       {
         abi: contractAddress.vaultAbi,
-      }
+      },
     );
     return result;
   }

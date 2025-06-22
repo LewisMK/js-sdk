@@ -1,11 +1,15 @@
-import { API } from "@orderly.network/types";
+import { API, SDKError } from "@orderly.network/types";
 import { useQuery } from "../useQuery";
-import { useEffect, useState } from "react";
-import { timeConvertString } from "@orderly.network/utils";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Decimal,
+  getTimestamp,
+  timeConvertString,
+} from "@orderly.network/utils";
 
 export const useFundingRate = (symbol: string) => {
   if (!symbol) {
-    throw new Error("useFuturesForSymbol requires a symbol");
+    throw new SDKError("Symbol is required");
   }
 
   const [countDown, setCountDown] = useState("00:00:00");
@@ -27,7 +31,7 @@ export const useFundingRate = (symbol: string) => {
       return;
     }
     const timer = setInterval(() => {
-      const diff = new Date(next_funding_time).getTime() - Date.now();
+      const diff = new Date(next_funding_time).getTime() - getTimestamp();
       const result = timeConvertString(diff);
       if (result.length === 3) {
         setCountDown(
@@ -38,13 +42,28 @@ export const useFundingRate = (symbol: string) => {
       }
     }, 1000);
     return () => {
-      clearInterval(timer);
+      clearInterval(timer as unknown as number);
     };
+  }, [data]);
+
+  const est_funding_rate = useMemo(() => {
+    if (!data) return;
+
+    const { next_funding_time, est_funding_rate = 0 } = data;
+
+    if (getTimestamp() > next_funding_time) {
+      return null;
+    }
+
+    return new Decimal(Number(est_funding_rate) * 100).toFixed(
+      4,
+      Decimal.ROUND_DOWN
+    );
   }, [data]);
 
   return {
     ...data,
-    est_funding_rate: (Number(data?.est_funding_rate ?? 0) * 100).toFixed(4),
+    est_funding_rate,
     countDown,
   };
 };

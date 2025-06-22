@@ -2,31 +2,38 @@ import useSWRInfinite, {
   type SWRInfiniteKeyLoader,
   type SWRInfiniteConfiguration,
 } from "swr/infinite";
-import { signatureMiddleware } from "./middleware/signatureMiddleware";
 import { get } from "@orderly.network/net";
-import { useAccount } from "./useAccount";
 import { AccountStatusEnum } from "@orderly.network/types";
+import { signatureMiddleware } from "./middleware/signatureMiddleware";
+import { useAccount } from "./useAccount";
 
-export const usePrivateInfiniteQuery = (
-  getKey: SWRInfiniteKeyLoader,
+export const usePrivateInfiniteQuery = <T>(
+  getKey: SWRInfiniteKeyLoader | null,
   options?: SWRInfiniteConfiguration & {
     formatter?: (data: any) => any;
-  }
+  },
 ) => {
   const { formatter, ...restOptions } = options || {};
-  const account = useAccount();
+  const { state } = useAccount();
 
   const middleware = Array.isArray(restOptions?.use)
-    ? restOptions?.use ?? []
+    ? (restOptions?.use ?? [])
     : [];
 
-  const result = useSWRInfinite(
+  const result = useSWRInfinite<T>(
     (pageIndex: number, previousPageData) => {
+      if (!getKey) return null;
+
       const queryKey = getKey(pageIndex, previousPageData);
-      if (account.state.status < AccountStatusEnum.EnableTrading || !queryKey) {
-        return null;
+      if (
+        queryKey &&
+        (state.status >= AccountStatusEnum.EnableTrading ||
+          state.status === AccountStatusEnum.EnableTradingWithoutConnected)
+      ) {
+        return [queryKey, state.accountId];
       }
-      return [queryKey, account.state.accountId];
+
+      return null;
     },
     (url: string, init: RequestInit) => {
       return restOptions.fetcher?.(url, init) || get(url, init, formatter);
@@ -34,7 +41,7 @@ export const usePrivateInfiniteQuery = (
     {
       ...restOptions,
       use: [signatureMiddleware, ...middleware],
-    }
+    },
   );
 
   return result;

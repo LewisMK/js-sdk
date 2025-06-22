@@ -1,5 +1,224 @@
 # @orderly.network/cli
 
+## 0.6.0
+
+### Minor Changes
+
+- publish
+- 4e5f109: publish
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies [4e5f109]
+  - @orderly.network/core@2.3.0
+
+## 0.6.0-alpha.0
+
+### Minor Changes
+
+- publish
+
+### Patch Changes
+
+- Updated dependencies
+  - @orderly.network/core@2.3.0-alpha.0
+
+## 0.5.0
+
+### Minor Changes
+
+- e1badae: publish
+- publish
+
+### Patch Changes
+
+- Updated dependencies [e1badae]
+- Updated dependencies
+  - @orderly.network/core@2.2.0
+
+## 0.5.0-alpha.0
+
+### Minor Changes
+
+- publish
+
+### Patch Changes
+
+- Updated dependencies
+  - @orderly.network/core@2.2.0-alpha.0
+
+## 0.4.3
+
+### Patch Changes
+
+- publish
+- 5ba2a31a8: publish
+- Updated dependencies
+- Updated dependencies [5ba2a31a8]
+  - @orderly.network/core@2.1.3
+
+## 0.4.3-alpha.0
+
+### Patch Changes
+
+- publish
+- Updated dependencies
+  - @orderly.network/core@2.1.3-alpha.0
+
+## 0.4.2
+
+### Patch Changes
+
+- publish
+- 7874fa6dd: publish
+- Updated dependencies
+- Updated dependencies [7874fa6dd]
+  - @orderly.network/core@2.1.2
+
+## 0.4.2-alpha.0
+
+### Patch Changes
+
+- publish
+- Updated dependencies
+  - @orderly.network/core@2.1.2-alpha.0
+
+## 0.4.1
+
+### Patch Changes
+
+- publish
+- 0b52044b6: publish
+- Updated dependencies
+- Updated dependencies [0b52044b6]
+  - @orderly.network/core@2.1.1
+
+## 0.4.1-alpha.0
+
+### Patch Changes
+
+- publish
+- Updated dependencies
+  - @orderly.network/core@2.1.1-alpha.0
+
+## 0.4.0
+
+### Minor Changes
+
+- publish
+
+### Patch Changes
+
+- ba163f4ce: publish
+- Updated dependencies [ba163f4ce]
+- Updated dependencies
+  - @orderly.network/core@2.1.0
+
+## 0.3.24-alpha.0
+
+### Patch Changes
+
+- publish
+- Updated dependencies
+  - @orderly.network/core@2.0.8-alpha.0
+
+## 0.3.23
+
+### Patch Changes
+
+- 423ab1d38: update
+- Updated dependencies [423ab1d38]
+  - @orderly.network/core@2.0.7
+
+## 0.3.23-alpha.0
+
+### Patch Changes
+
+- update
+- Updated dependencies
+  - @orderly.network/core@2.0.7-alpha.0
+
+## 0.3.22
+
+### Patch Changes
+
+- 74c2c433e: fix bugs
+- Updated dependencies [74c2c433e]
+  - @orderly.network/core@2.0.6
+
+## 0.3.22-alpha.0
+
+### Patch Changes
+
+- fix bugs
+- Updated dependencies
+  - @orderly.network/core@2.0.6-alpha.0
+
+## 0.3.21
+
+### Patch Changes
+
+- 7f737173b: update
+- Updated dependencies [7f737173b]
+  - @orderly.network/core@2.0.5
+
+## 0.3.21-alpha.0
+
+### Patch Changes
+
+- update
+- Updated dependencies
+  - @orderly.network/core@2.0.5-alpha.0
+
+## 0.3.20
+
+### Patch Changes
+
+- cca30140b: fix ledger issues
+- Updated dependencies [cca30140b]
+  - @orderly.network/core@2.0.3
+
+## 0.3.20-alpha.0
+
+### Patch Changes
+
+- fix ledger issues
+- Updated dependencies
+  - @orderly.network/core@2.0.3-alpha.0
+
+## 0.3.19
+
+### Patch Changes
+
+- a3becba1a: update
+- Updated dependencies [a3becba1a]
+  - @orderly.network/core@2.0.2
+
+## 0.3.19-alpha.0
+
+### Patch Changes
+
+- update
+- Updated dependencies
+  - @orderly.network/core@2.0.2-alpha.0
+
+## 0.3.18
+
+### Patch Changes
+
+- 0fd2e6038: add some features
+- Updated dependencies [0fd2e6038]
+  - @orderly.network/core@2.0.1
+
+## 0.3.18-alpha.0
+
+### Patch Changes
+
+- add some features
+- Updated dependencies
+  - @orderly.network/core@2.0.1-alpha.8
+
 ## 0.3.17
 
 ### Patch Changes
@@ -68,9 +287,35 @@
 
 ### Patch Changes
 
-- remove total validate of useOrderEntry
+- b033ce0: test
+- b15becb: test
+- Updated dependencies [113773f]
+- Updated dependencies [b033ce0]
+- Updated dependencies [b15becb]
+  - @orderly.network/core@2.0.0
+
+## 0.3.13-alpha.2
+
+### Patch Changes
+
+- test
 - Updated dependencies
-  - @orderly.network/core@1.5.13
+  - @orderly.network/core@2.0.0-alpha.2
+
+## 0.3.13-alpha.1
+
+### Patch Changes
+
+- test
+- Updated dependencies
+  - @orderly.network/core@2.0.0-alpha.1
+
+## 0.3.13-alpha.0
+
+### Patch Changes
+
+- Updated dependencies
+  - @orderly.network/core@2.0.0-alpha.0
 
 ## 0.3.12
 

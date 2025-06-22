@@ -1,6 +1,16 @@
-import { PropsWithChildren, createContext, useContext, useRef } from "react";
+import React, {
+  PropsWithChildren,
+  createContext,
+  useContext,
+  useRef,
+} from "react";
+import { CalculatorService } from "./orderly/calculator/calculatorService";
+import { useWSObserver } from "./orderly/internal/useWSObserver";
 import { usePrivateDataObserver } from "./orderly/usePrivateDataObserver";
+import { usePublicDataObserver } from "./orderly/usePublicDataObserver";
+import { useCalculatorService } from "./useCalculatorService";
 import { usePreLoadData } from "./usePreloadData";
+import { useSimpleDI } from "./useSimpleDI";
 
 export type getKeyFunction = (index: number, prevData: any) => string | null;
 
@@ -9,22 +19,33 @@ interface DataCenterContextState {
   // positions
   // balances
   //
-  regesterKeyHandler: (key: string, handler: getKeyFunction) => void;
+  registerKeyHandler: (key: string, handler: getKeyFunction) => void;
   unregisterKeyHandler: (key: string) => void;
 }
 
 export const DataCenterContext = createContext<DataCenterContextState>(
-  {} as any
+  {} as any,
 );
 
 export const useDataCenterContext = () => useContext(DataCenterContext);
 
-export const DataCenterProvider = ({ children }: PropsWithChildren) => {
+export const DataCenterProvider: React.FC<PropsWithChildren> = ({
+  children,
+}) => {
   /**
    *  preload the required data for the app
    *  hidden view while the required data is not ready
    */
   const { error, done } = usePreLoadData();
+
+  const calculatorService = useCalculatorService();
+
+  usePublicDataObserver();
+
+  /**
+   * WS observer
+   */
+  useWSObserver(calculatorService);
 
   const getKeyHandlerMapRef = useRef<Map<string, getKeyFunction>>(new Map());
 
@@ -38,12 +59,14 @@ export const DataCenterProvider = ({ children }: PropsWithChildren) => {
     return <div>Data load failed</div>;
   }
 
-  if (!done) return null;
+  if (!done) {
+    return null;
+  }
 
   return (
     <DataCenterContext.Provider
       value={{
-        regesterKeyHandler: (key, fun) => {
+        registerKeyHandler: (key, fun) => {
           getKeyHandlerMapRef.current.set(key, fun);
         },
         unregisterKeyHandler: (key) => {

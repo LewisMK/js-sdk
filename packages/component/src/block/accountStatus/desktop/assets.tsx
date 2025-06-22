@@ -25,7 +25,7 @@ import Button from "@/button";
 import { NetworkImage } from "@/icon";
 import { AccountStatusEnum } from "@orderly.network/types";
 import { WalletConnectSheet } from "@/block/walletConnect";
-import { modal } from "@/modal";
+import { modal } from "@orderly.network/ui";
 import { cn } from "@/utils/css";
 import { isTestnet } from "@orderly.network/utils";
 import { Divider } from "@/divider";
@@ -39,7 +39,7 @@ const KEY = "ORDERLY_WEB_ASSETS_COLLAPSED";
 
 export const Assets: FC<AssetsProps> = (props) => {
   // const [expand, { toggle }] = useBoolean(false);
-  const [collapsed, setCollapsed] = useLocalStorage(KEY, 1);
+  const [collapsed, setCollapsed] = useLocalStorage(KEY, 0);
   const { totalCollateral, freeCollateral, totalValue, availableBalance } =
     useCollateral({
       dp: 2,
@@ -74,7 +74,7 @@ export const Assets: FC<AssetsProps> = (props) => {
     }
     setDisableGetTestUSDC(true);
     return getTestUSDC({
-      chain_id: account.wallet?.chainId.toString(),
+      chain_id: account.walletAdapter?.chainId.toString(),
       user_address: state.address,
       broker_id: config.get("brokerId"),
     }).then(
@@ -146,13 +146,13 @@ export const Assets: FC<AssetsProps> = (props) => {
               surfix={
                 <span
                   className={
-                    "orderly-text-base-contrast-36 orderly-font-semibold"
+                    "orderly-text-base-contrast-36 orderly-font-semibold orderly-text-base"
                   }
                 >
                   USDC
                 </span>
               }
-              className="desktop:orderly-font-semibold"
+              className="desktop:orderly-font-semibold orderly-text-base"
             >
               {availableBalance}
             </Numeral>

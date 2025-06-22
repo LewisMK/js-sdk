@@ -4,6 +4,7 @@ import {
   useLocalStorage,
   useTPSLOrder,
   useMediaQuery,
+  useDebouncedCallback,
 } from "@orderly.network/hooks";
 import {
   MEDIA_TABLET,
@@ -14,6 +15,7 @@ import { toast } from "@/toast";
 import { AlgoOrderConfirmView } from "./algoOrderConfirmView";
 import { SimpleDialog } from "@/dialog/simpleDialog";
 import { AlgoOrderEntity } from "@orderly.network/types";
+import { cn } from "@/utils";
 
 export const TPSLEditor: FC<{
   symbol: string;
@@ -66,7 +68,7 @@ export const TPSLEditor: FC<{
     }
   }, [mode]);
 
-  const onSubmit = () => {
+  const onSubmit = useDebouncedCallback(() => {
     return submit().then(
       () => {
         setOpen(false);
@@ -76,7 +78,9 @@ export const TPSLEditor: FC<{
         toast.error(error.message);
       }
     );
-  };
+  }, 500, {
+    leading: true, trailing: false
+  });
 
   useEffect(() => {
     let type: AlgoOrderRootType;
@@ -159,6 +163,7 @@ export const TPSLEditor: FC<{
           title={title}
           maxWidth={props.isEditing ? "xs" : "sm"}
           onCancel={() => setOpen(false)}
+          // @ts-ignore
           onOk={() => onSubmit()}
           closable
         >
@@ -194,6 +199,7 @@ export const TPSLEditor: FC<{
             symbol={symbol}
             oldOrder={props.order}
             onCancel={() => setOpen(false)}
+            // @ts-ignore
             onConfirm={() => onSubmit()}
             quoteDp={quoteDp}
           />

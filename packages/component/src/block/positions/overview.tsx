@@ -2,7 +2,7 @@ import Button from "@/button";
 import { Select } from "@/select";
 import { Statistic } from "@/statistic";
 import React, { type FC } from "react";
-import { modal } from "@/modal";
+import { modal } from "@orderly.network/ui";
 import { Checkbox } from "@/checkbox";
 import { Label } from "@/label";
 
@@ -45,24 +45,24 @@ export const PositionOverview: FC<OverviewProps> = (props) => {
         className="orderly-flex orderly-justify-between orderly-bg-base-900 orderly-px-4 orderly-pt-3"
       >
         <Statistic
-          labelClassName="orderly-text-4xs orderly-text-base-contrast-36"
-          valueClassName="orderly-text-3xs"
+          labelClassName="orderly-text-3xs orderly-text-base-contrast-36"
+          valueClassName="orderly-text-xs"
           label="Unreal. PnL"
           value={aggregated?.unrealPnL}
           coloring
           rule="price"
         />
         <Statistic
-          labelClassName="orderly-text-4xs orderly-text-base-contrast-36"
-          valueClassName="orderly-text-3xs"
+          labelClassName="orderly-text-3xs orderly-text-base-contrast-36"
+          valueClassName="orderly-text-xs"
           label="Notional"
           value={aggregated?.notional}
           rule="price"
         />
         <Statistic
           label=""
-          labelClassName="orderly-text-4xs orderly-text-base-contrast-36"
-          valueClassName="orderly-text-3xs"
+          labelClassName="orderly-text-3xs orderly-text-base-contrast-36"
+          valueClassName="orderly-text-xs"
           value={<div />}
           rule="price"
           coloring

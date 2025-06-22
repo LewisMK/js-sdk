@@ -1,8 +1,9 @@
-import { API } from "@orderly.network/types";
-import { usePrivateQuery } from "../usePrivateQuery";
 import { useMemo } from "react";
-import { useWS } from "../useWS";
 import useSWRSubscription from "swr/subscription";
+import { API } from "@orderly.network/types";
+import { getTimestamp } from "@orderly.network/utils";
+import { usePrivateQuery } from "../usePrivateQuery";
+import { useWS } from "../useWS";
 
 export const useHoldingStream = () => {
   const ws = useWS();
@@ -13,7 +14,7 @@ export const useHoldingStream = () => {
       formatter: (data) => {
         return data.holding;
       },
-    }
+    },
   );
 
   const usdc = useMemo(() => {
@@ -27,7 +28,7 @@ export const useHoldingStream = () => {
         id: "balance",
         event: "subscribe",
         topic: "balance",
-        ts: Date.now(),
+        ts: getTimestamp(),
       },
       {
         onMessage: (data: any) => {
@@ -37,18 +38,21 @@ export const useHoldingStream = () => {
             mutate((prevData) => {
               return prevData?.map((item) => {
                 const token = holding[item.token];
-                return {
-                  ...item,
-                  frozen: token.frozen,
-                  holding: token.holding,
-                };
+                if (token) {
+                  return {
+                    ...item,
+                    frozen: token.frozen,
+                    holding: token.holding,
+                  };
+                }
+                return item;
               });
             });
 
             next(holding);
           }
         },
-      }
+      },
     );
 
     return () => unsubscribe();

@@ -6,10 +6,12 @@ export type ConfigKey =
   | "operatorUrl"
   | "domain"
   | "brokerId"
-    | "brokerName"
+  | "brokerName"
   | "networkId"
   | "env"
+  | "chainNamespace"
   | "PROD_URL"
+  | "orderly_markets"
   | "markets";
 
 export interface ConfigStore {

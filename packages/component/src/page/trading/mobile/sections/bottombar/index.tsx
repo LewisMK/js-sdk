@@ -4,7 +4,7 @@ import { WsStatus } from "@/block/accountStatus/sections/WsStatus";
 import { ChainIdSwtich } from "@/block/accountStatus/sections/chainIdSwitch";
 import { GetTestUSDC } from "@/block/operation/getTestUSDC";
 import { WalletConnectSheet } from "@/block/walletConnect";
-import { modal } from "@/modal";
+import { modal } from "@orderly.network/ui";
 import { OrderlyAppContext } from "@/provider";
 import {
   useAccount,
@@ -27,10 +27,19 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = (props) => {
   const { errors } = useContext(OrderlyAppContext);
   const { ws: wsStatus } = useContext(StatusContext);
 
-  const { onWalletConnect, onSetChain, onWalletDisconnect } =
+  const { onWalletConnect, onSetChain } =
     useContext(OrderlyAppContext);
 
-  const { connectedChain } = useWalletConnector();
+
+  const { connectedChain, disconnect } = useWalletConnector();
+
+  const { account } = useAccount();
+  const onDisconnect = async () => {
+    await disconnect({
+      label: state.connectWallet?.name,
+    });
+    await account.disconnect();
+  };
 
   const onConnect = useCallback(() => {
     onWalletConnect().then(
@@ -72,7 +81,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = (props) => {
           accountInfo={data}
           totalValue={totalValue}
           onConnect={onConnect}
-          onDisconnect={onWalletDisconnect}
+          onDisconnect={onDisconnect}
           showGetTestUSDC={showGetTestUSDC}
         />
       </div>

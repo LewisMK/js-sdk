@@ -1,4 +1,10 @@
-import { API, WSMessage } from "@orderly.network/types";
+import {
+  AlgoOrderRootType,
+  AlgoOrderType,
+  API,
+  SDKError,
+  WSMessage,
+} from "@orderly.network/types";
 import { BaseMergeHandler } from "./baseMergeHandler";
 import { object2underscore } from "../../utils/ws";
 
@@ -59,7 +65,7 @@ export class AlgoOrderMergeHandler extends BaseMergeHandler<
         order.algoOrderId === order.rootAlgoOrderId
     );
     if (rootOrderIndex === -1) {
-      throw new Error("Root order not found");
+      throw new SDKError("Root order not found");
     }
 
     const rootOrder_ = object2underscore(
@@ -72,6 +78,36 @@ export class AlgoOrderMergeHandler extends BaseMergeHandler<
         return object2underscore(order) as unknown as API.AlgoOrder;
       });
 
+    if (
+      rootOrder_.algo_type === "BRACKET" &&
+      rootOrder_.child_orders.length > 0
+    ) {
+      // @ts-ignore
+      const childOrders = this.groupBracketChildOrders([
+        ...rootOrder_.child_orders,
+      ]);
+      rootOrder_.child_orders = [childOrders];
+    }
+
     return rootOrder_;
+  }
+
+  static groupBracketChildOrders(orders: WSMessage.AlgoOrder[]): API.AlgoOrder {
+    const innerOrders = [...orders];
+    const rootOrderIndex = innerOrders.findIndex(
+      (order) =>
+        order.algoType !== AlgoOrderType.STOP_LOSS &&
+        order.algoType !== AlgoOrderType.TAKE_PROFIT
+    );
+    if (rootOrderIndex === -1) {
+      throw new SDKError("Root order not found");
+    }
+
+    const rootOrder = innerOrders.splice(
+      rootOrderIndex,
+      1
+    )[0] as unknown as API.AlgoOrder;
+    rootOrder.child_orders = innerOrders as unknown as API.AlgoOrder[];
+    return rootOrder;
   }
 }

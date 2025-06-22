@@ -1,5 +1,158 @@
 # create-orderly-app
 
+## 1.8.0
+
+### Minor Changes
+
+- publish
+- 4e5f109: publish
+
+## 1.8.0-alpha.0
+
+### Minor Changes
+
+- publish
+
+## 1.7.0
+
+### Minor Changes
+
+- e1badae: publish
+- publish
+
+## 1.7.0-alpha.0
+
+### Minor Changes
+
+- publish
+
+## 1.6.3
+
+### Patch Changes
+
+- publish
+- 5ba2a31a8: publish
+
+## 1.6.3-alpha.0
+
+### Patch Changes
+
+- publish
+
+## 1.6.2
+
+### Patch Changes
+
+- publish
+- 7874fa6dd: publish
+
+## 1.6.2-alpha.0
+
+### Patch Changes
+
+- publish
+
+## 1.6.1
+
+### Patch Changes
+
+- publish
+- 0b52044b6: publish
+
+## 1.6.1-alpha.0
+
+### Patch Changes
+
+- publish
+
+## 1.6.0
+
+### Minor Changes
+
+- publish
+
+### Patch Changes
+
+- ba163f4ce: publish
+
+## 1.5.24-alpha.0
+
+### Patch Changes
+
+- publish
+
+## 1.5.23
+
+### Patch Changes
+
+- 423ab1d38: update
+
+## 1.5.23-alpha.0
+
+### Patch Changes
+
+- update
+
+## 1.5.22
+
+### Patch Changes
+
+- 74c2c433e: fix bugs
+
+## 1.5.22-alpha.0
+
+### Patch Changes
+
+- fix bugs
+
+## 1.5.21
+
+### Patch Changes
+
+- 7f737173b: update
+
+## 1.5.21-alpha.0
+
+### Patch Changes
+
+- update
+
+## 1.5.20
+
+### Patch Changes
+
+- cca30140b: fix ledger issues
+
+## 1.5.20-alpha.0
+
+### Patch Changes
+
+- fix ledger issues
+
+## 1.5.19
+
+### Patch Changes
+
+- a3becba1a: update
+
+## 1.5.19-alpha.0
+
+### Patch Changes
+
+- update
+
+## 1.5.18
+
+### Patch Changes
+
+- 0fd2e6038: add some features
+
+## 1.5.18-alpha.0
+
+### Patch Changes
+
+- add some features
+
 ## 1.5.17
 
 ### Patch Changes
@@ -52,7 +205,20 @@
 
 ### Patch Changes
 
-- remove total validate of useOrderEntry
+- b033ce0: test
+- b15becb: test
+
+## 1.5.13-alpha.1
+
+### Patch Changes
+
+- test
+
+## 1.5.13-alpha.0
+
+### Patch Changes
+
+- test
 
 ## 1.5.12
 

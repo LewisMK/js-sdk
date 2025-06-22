@@ -1,12 +1,24 @@
-import { API, OrderEntity } from "@orderly.network/types";
+import { API, OrderType, OrderlyOrder } from "@orderly.network/types";
 
-export type VerifyResult = {
-  [P in keyof OrderEntity]?: { type: string; message: string };
+export type OrderValidationItem =
+  | {
+      type: "required";
+      message: string;
+      value?: never;
+    }
+  | {
+      type: "max" | "min";
+      message: string;
+      value: number | string;
+    };
+
+export type OrderValidationResult = {
+  [P in keyof OrderlyOrder]?: OrderValidationItem;
 };
 
 export type OrderFormEntity = Pick<
-  OrderEntity,
-  "order_price" | "order_quantity" | "total" | "reduce_only"
+  OrderlyOrder,
+  "order_price" | "order_quantity" | "total" | "reduce_only" | "slippage"
 >;
 
 export type ValuesDepConfig = {
@@ -14,14 +26,17 @@ export type ValuesDepConfig = {
   symbol: API.SymbolExt;
   maxQty: number;
   markPrice: number;
+  estSlippage?: number | null;
 };
 
 export interface OrderCreator<T> {
   create: (values: T, configs: ValuesDepConfig) => T;
   validate: (
     values: T,
-    configs: ValuesDepConfig
+    configs: ValuesDepConfig,
   ) => Promise<{
-    [P in keyof T]?: { type: string; message: string };
+    [P in keyof T]?: OrderValidationItem;
   }>;
+
+  get type(): OrderType;
 }

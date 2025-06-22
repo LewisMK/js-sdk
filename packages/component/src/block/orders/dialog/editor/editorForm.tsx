@@ -5,10 +5,13 @@ import { Input } from "@/input";
 import { Slider } from "@/slider";
 import { Statistic } from "@/statistic";
 import { Text } from "@/text";
-import { useOrderEntry, useSymbolsInfo } from "@orderly.network/hooks";
+import {
+  useOrderEntry_deprecated,
+  useSymbolsInfo,
+} from "@orderly.network/hooks";
 import { API, OrderEntity, OrderSide, OrderType } from "@orderly.network/types";
 import { Controller, useForm } from "react-hook-form";
-import { modal } from "@/modal";
+import { modal } from "@orderly.network/ui";
 import { toast } from "@/toast";
 import { commify } from "@orderly.network/utils";
 import { OrderListContext } from "../../shared/orderListContext";
@@ -29,8 +32,11 @@ export const OrderEditForm: FC<OrderEditFormProps> = (props) => {
   const isMarket = order.type === "MARKET";
   // const { hide, reject, resolve } = useModal();
   // @ts-ignore
-  const { markPrice, maxQty, helper, metaState } = useOrderEntry(order.symbol, order.side);
-
+  const { markPrice, maxQty, helper, metaState } = useOrderEntry_deprecated(
+    // @ts-ignore
+    order.symbol,
+    order.side
+  );
 
   const orderType = useMemo(() => {
     if (isAlgoOrder) {
@@ -38,7 +44,6 @@ export const OrderEditForm: FC<OrderEditFormProps> = (props) => {
     }
 
     return order.type;
-
   }, [order, isAlgoOrder]);
 
   const {
@@ -67,7 +72,7 @@ export const OrderEditForm: FC<OrderEditFormProps> = (props) => {
       if (errors.total?.message !== undefined) {
         toast.error(errors.total?.message);
       }
-      
+
       return {
         values,
         errors,
@@ -75,10 +80,7 @@ export const OrderEditForm: FC<OrderEditFormProps> = (props) => {
     },
   });
 
-  
-
   // console.log("editor form ", order);
-
 
   const symbolInfo = useSymbolsInfo()[order.symbol];
 
@@ -117,9 +119,13 @@ export const OrderEditForm: FC<OrderEditFormProps> = (props) => {
     (data: any) => {
       return onConfirm(data, dirtyFields).then(
         (data: any) => {
+          if (isAlgoOrder && order.type === 'MARKET' && 'order_price' in data) {
+            const { order_price, ...rest} = data;
+            return onSubmit(rest);
+          }
           return onSubmit(data);
         },
-        () => { }
+        () => {}
       );
     },
     [quote, order, dirtyFields]
@@ -180,29 +186,32 @@ export const OrderEditForm: FC<OrderEditFormProps> = (props) => {
       <form onSubmit={handleSubmit(onFormSubmit)}>
         <div className="orderly-flex orderly-flex-col orderly-gap-5">
           {/* @ts-ignore */}
-          {isAlgoOrder && <Controller
-            name="trigger_price"
-            control={control}
-            render={({ field }) => {
-              return (
-                <Input
-                  prefix="Trigger price"
-                  suffix={quote}
-                  type="text"
-                  inputMode="decimal"
-                  containerClassName="orderly-bg-base-500 orderly-rounded-borderRadius"
-                  helpText={errors.trigger_price?.message}
-                  error={!!errors.trigger_price}
-                  className="orderly-text-right orderly-text-3xs"
-                  value={field.value!}
-                  onChange={(e) => {
-                    // field.onChange(e.target.value)
-                    onFieldChange("trigger_price", e.target.value);
-                  }}
-                />
-              );
-            }}
-          />}
+          {isAlgoOrder && (
+            // @ts-ignore
+            <Controller
+              name="trigger_price"
+              control={control}
+              render={({ field }) => {
+                return (
+                  <Input
+                    prefix="Trigger price"
+                    suffix={quote}
+                    type="text"
+                    inputMode="decimal"
+                    containerClassName="orderly-bg-base-500 orderly-rounded-borderRadius"
+                    helpText={errors.trigger_price?.message}
+                    error={!!errors.trigger_price}
+                    className="orderly-text-right orderly-text-3xs"
+                    value={field.value!}
+                    onChange={(e) => {
+                      // field.onChange(e.target.value)
+                      onFieldChange("trigger_price", e.target.value);
+                    }}
+                  />
+                );
+              }}
+            />
+          )}
           {/* @ts-ignore */}
           <Controller
             name="order_price"
@@ -278,7 +287,7 @@ export const OrderEditForm: FC<OrderEditFormProps> = (props) => {
           />
         </div>
 
-        <div className="orderly-grid orderly-grid-cols-2 orderly-gap-3 orderly-py-5">
+        <div className="orderly-grid orderly-grid-cols-2 orderly-gap-3 orderly-py-5 orderly-text-xs">
           <Button
             fullWidth
             variant="contained"

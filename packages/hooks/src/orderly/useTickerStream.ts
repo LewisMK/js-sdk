@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "../useQuery";
-import { API } from "@orderly.network/types";
+import { API, SDKError } from "@orderly.network/types";
 import { Decimal } from "@orderly.network/utils";
 import { useWS } from "../useWS";
 import { useMarkPrice } from "./useMarkPrice";
 import { useIndexPrice } from "./useIndexPrice";
 import { useOpenInterest } from "./useOpenInterest";
-import { useFetures } from "../unuse/useFetures";
+import { useFutures } from "./useFutures";
 
 export const useTickerStream = (symbol: string) => {
   if (!symbol) {
-    throw new Error("useFuturesForSymbol requires a symbol");
+    throw new SDKError("Symbol is required");
   }
   const { data: info } = useQuery<API.MarketInfo>(
     `/v1/public/futures/${symbol}`,
@@ -51,7 +51,7 @@ export const useTickerStream = (symbol: string) => {
   const { data: markPrice } = useMarkPrice(symbol);
   const { data: indexPrice } = useIndexPrice(symbol);
   const { data: openInterest } = useOpenInterest(symbol);
-  const { data: futures } = useFetures();
+  const { data: futures } = useFutures();
 
   const value = useMemo(() => {
     //
@@ -92,6 +92,7 @@ export const useTickerStream = (symbol: string) => {
 
     if (ticker.volume !== undefined) {
       config["24h_volumn"] = ticker.volume;
+      config["24h_volume"] = ticker.volume;
     }
 
     if (ticker.close !== undefined && ticker.open !== undefined) {
@@ -100,10 +101,12 @@ export const useTickerStream = (symbol: string) => {
         .div(ticker.open)
         .toNumber();
 
-      config["24h_change"] = new Decimal(ticker.close).minus(ticker.open);
+      config["24h_change"] = new Decimal(ticker.close)
+        .minus(ticker.open)
+        .toNumber();
     }
     return config;
   }, [info, symbol, ticker, futures, openInterest]);
 
-  return value as API.MarketInfo & { change?: Decimal; "24h_change"?: Decimal };
+  return value as API.MarketInfo & { change?: number; "24h_change"?: number };
 };

@@ -1,4 +1,11 @@
+/* eslint-disable @typescript-eslint/no-namespace */
 import { AlgoOrderRootType, OrderSide, OrderType } from "../order";
+
+export enum AnnouncementType {
+  Listing = "LISTING",
+  Maintenance = "MAINTENANCE",
+  Delisting = "DELISTING",
+}
 
 export declare namespace API {
   //v1/public/token
@@ -31,13 +38,30 @@ export declare namespace API {
     "24h_close": number;
     "24h_high": number;
     "24h_low": number;
+    /**
+     * @deprecated
+     * spelling mistake, use 24h_volume to instead, will be remove next version
+     */
     "24h_volumn": number;
+    "24h_volume": number;
     "24h_amount": number;
   }
 
   export interface MarketInfoExt extends MarketInfo {
     change: number;
     "24h_volume": number;
+  }
+
+  export interface Announcement {
+    last_updated_time?: number | null;
+    rows?: Array<{
+      announcement_id: number | string;
+      message: string;
+      i18n?: Record<PropertyKey, string | null>;
+      url?: string | null;
+      type?: AnnouncementType | null;
+      updated_time?: number | null;
+    }>;
   }
 
   /**
@@ -177,7 +201,41 @@ export declare namespace API {
     sum_unitary_funding: number;
   }
 
-  export interface PositionInfo {
+  export interface FundingPeriodData {
+    rate: number;
+    positive: number;
+    negative: number;
+  }
+
+  export interface FundingHistory {
+    symbol: string;
+    data_start_time: string;
+    funding: {
+      last: FundingPeriodData;
+      "1d": FundingPeriodData;
+      "3d": FundingPeriodData;
+      "7d": FundingPeriodData;
+      "14d": FundingPeriodData;
+      "30d": FundingPeriodData;
+      "90d": FundingPeriodData;
+    };
+  }
+
+  export interface PositionInfo extends PositionAggregated {
+    // margin_ratio: number;
+    // initial_margin_ratio: number;
+    // maintenance_margin_ratio: number;
+    // open_margin_ratio: number;
+    // current_margin_ratio_with_orders: number;
+    // initial_margin_ratio_with_orders: number;
+    // maintenance_margin_ratio_with_orders: number;
+    // total_collateral_value: number;
+    // free_collateral: number;
+    rows: Position[];
+    // total_pnl_24_h: number;
+  }
+
+  export interface PositionAggregated {
     margin_ratio: number;
     initial_margin_ratio: number;
     maintenance_margin_ratio: number;
@@ -187,11 +245,25 @@ export declare namespace API {
     maintenance_margin_ratio_with_orders: number;
     total_collateral_value: number;
     free_collateral: number;
-    rows: Position[];
     total_pnl_24_h: number;
+    /**
+     * @deprecated use total_unreal_pnl instead
+     */
+    unrealPnL: number;
+    total_unreal_pnl: number;
+    total_unreal_pnl_index?: number;
+    /**
+     * @deprecated use total_unsettled_pnl instead
+     */
+    unsettledPnL: number;
+    total_unsettled_pnl: number;
+    notional: number;
+    unrealPnlROI: number;
+    unrealPnlROI_index?: number;
   }
 
   export interface Position {
+    account_id?: string;
     symbol: string;
     position_qty: number;
     cost_position: number;
@@ -201,10 +273,13 @@ export declare namespace API {
     settle_price: number;
     average_open_price: number;
     unrealized_pnl: number;
+    unrealized_pnl_index?: number;
     unrealized_pnl_ROI: number;
     unsettled_pnl: number;
     unsettled_pnl_ROI: number;
+    unrealized_pnl_ROI_index?: number;
     mark_price: number;
+    index_price?: number;
     est_liq_price: number | null;
     timestamp: number;
     /**
@@ -216,6 +291,7 @@ export declare namespace API {
     MMR_with_orders: number;
     pnl_24_h: number;
     fee_24_h: number;
+    fundingFee?: number;
   }
 
   export interface PositionExt extends Position {
@@ -233,6 +309,10 @@ export declare namespace API {
      * related position tp/sl order
      */
     algo_order?: AlgoOrder;
+  }
+
+  export interface PositionsTPSLExt extends PositionAggregated {
+    rows: PositionTPSLExt[];
   }
 
   export interface Trade {
@@ -318,6 +398,119 @@ export declare namespace API {
     decimals: number;
     withdrawal_fee: number;
   }
+
+  export interface AssetHistory {
+    meta: RecordsMeta;
+    rows: AssetHistoryRow[];
+  }
+
+  export interface RecordsMeta {
+    total: number;
+    records_per_page: number;
+    current_page: number;
+  }
+
+  export interface AssetHistoryRow {
+    id: string;
+    tx_id: string;
+    side: string;
+    token: string;
+    amount: number;
+    fee: number;
+    trans_status: string;
+    created_time: number;
+    updated_time: number;
+    chain_id: string;
+  }
+
+  export interface FundingFeeHistory {
+    meta: RecordsMeta;
+    rows: FundingFeeRow[];
+  }
+
+  export interface FundingFeeRow {
+    symbol: string;
+    funding_rate: number;
+    mark_price: number;
+    funding_fee: number;
+    payment_type: string;
+    status: string;
+    created_time: number;
+    updated_time: number;
+  }
+
+  export interface TransferHistoryRow {
+    amount: number;
+    created_time: number;
+    from_account_id: string;
+    id: string;
+    status: "CREATED" | "PENDING" | "COMPLETED" | "FAILED";
+    to_account_id: string;
+    token: string;
+    updated_time: number;
+  }
+
+  export interface TransferHistory {
+    meta: RecordsMeta;
+    rows: TransferHistoryRow[];
+  }
+
+  export interface TransferHistoryRow {
+    amount: number;
+    created_time: number;
+    from_account_id: string;
+    id: string;
+    status: "CREATED" | "PENDING" | "COMPLETED" | "FAILED";
+    to_account_id: string;
+    token: string;
+    updated_time: number;
+  }
+
+  export interface DailyRow {
+    account_value: number;
+    broker_id: string;
+    date: string;
+    perp_volume: number;
+    pnl: number;
+    snapshot_time?: number;
+  }
+
+  export interface PositionHistory {
+    position_id: number; // Unique identifier for the position
+    liquidation_id?: number; // Unique identifier for the position
+    position_status: string; // Status of the position
+    type: string; // Type of the position activity
+    symbol: string; // Trading pair symbol
+    avg_open_price: number; // Average open price of the position
+    avg_close_price: number; // Average close price of the position
+    max_position_qty: number; // Maximum quantity held in the position
+    closed_position_qty: number; // Quantity closed in the position
+    side: "LONG" | "SHORT"; // Side of the position
+    trading_fee: number; // Fee charged for trading
+    accumulated_funding_fee: number; // Accumulated funding fee for the position
+    insurance_fund_fee: number; // Fee contributed to the insurance fund
+    liquidator_fee: number; // Fee paid to the liquidator
+    realized_pnl: number; // Realized profit and loss
+    open_timestamp: number; // Timestamp when the position was opened
+    close_timestamp: number; // Timestamp when the position was closed
+    last_update_time: number; // Timestamp of the last update to the position
+  }
+
+  export interface LiquidationPositionByPerp {
+    abs_liquidation_fee: number;
+    cost_position_transfer: number;
+    liquidator_fee: number;
+    position_qty: number;
+    symbol: string;
+    transfer_price: number;
+  }
+
+  export interface Liquidation {
+    liquidation_id: number;
+    timestamp: number;
+    transfer_amount_to_insurance_fund: number;
+    positions_by_perp: LiquidationPositionByPerp[];
+  }
 }
 
 export declare namespace WSMessage {
@@ -330,7 +523,9 @@ export declare namespace WSMessage {
     volume: number;
     amount: number;
     count: number;
+    change: number;
   }
+
   export interface MarkPrice {
     symbol: string;
     price: number;
@@ -391,6 +586,22 @@ export declare namespace WSMessage {
     maker: boolean;
   }
 
+  export interface Holding {
+    holding: number;
+    frozen: number;
+    interest: number;
+    pendingShortQty: number;
+    pendingExposure: number;
+    pendingLongQty: number;
+    pendingLongExposure: number;
+    version: number;
+    staked: number;
+    unbonding: number;
+    vault: number;
+    fee24H: number;
+    markPrice: number;
+  }
+
   export interface AlgoOrder {
     symbol: string;
     rootAlgoOrderId: number;
@@ -420,5 +631,14 @@ export declare namespace WSMessage {
     maker: boolean;
     rootAlgoStatus: string;
     algoStatus: string;
+  }
+
+  export interface Announcement {
+    announcement_id: string;
+    message: string;
+    i18n: Record<PropertyKey, string | null>;
+    url?: string | null;
+    type: AnnouncementType | null;
+    updated_time: number;
   }
 }

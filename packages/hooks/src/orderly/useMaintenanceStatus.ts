@@ -1,27 +1,35 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "../useQuery";
 import { useConfig } from "../useConfig";
 import { useWS } from "../useWS";
 
 const oneDay = 1000 * 60 * 60 * 24;
 
+/** 0 for nothing,  2 for maintenance */
+export enum MaintenanceStatus {
+  None = 0,
+  Maintenance = 2,
+}
+
 export function useMaintenanceStatus() {
-  // 0 for nothing,  2 for maintenance
-  const [status, setStatus] = useState<number>(0);
+  const [status, setStatus] = useState<number>(MaintenanceStatus.None);
   const [startTime, setStartTime] = useState<number>();
   const [endTime, setEndTime] = useState<number>();
   const [brokerName, setBrokerName] = useState<string>("Orderly network");
-  const { data: systemInfo, mutate } = useQuery<any>(`/v1/public/system_info`, {
-    revalidateOnFocus: false,
-    errorRetryCount: 2,
-    errorRetryInterval: 200,
-  });
+  const { data: systemInfo, mutate } = useQuery<any>(
+    `/v1/public/system_info?source=maintenance`,
+    {
+      revalidateOnFocus: false,
+      errorRetryCount: 2,
+      errorRetryInterval: 200,
+    }
+  );
   const ws = useWS();
 
   const config = useConfig();
 
   useEffect(() => {
-    if (!systemInfo || !systemInfo.data) {
+    if (!systemInfo) {
       return;
     }
 
@@ -29,12 +37,18 @@ export function useMaintenanceStatus() {
     if (brokerName) {
       setBrokerName(brokerName);
     }
-    if (systemInfo.data.scheduled_maintenance) {
-      setStartTime(systemInfo.data.scheduled_maintenance.start_time);
-      setEndTime(systemInfo.data.scheduled_maintenance.end_time);
+    // systemInfo.status = 2;
+    // systemInfo.scheduled_maintenance = {
+    //   start_time: new Date("2024-08-27").getTime(),
+    //   end_time: new Date("2024-08-30").getTime(),
+    // };
+    console.log("--systemInfo", systemInfo, brokerName);
+    if (systemInfo.scheduled_maintenance) {
+      setStartTime(systemInfo.scheduled_maintenance.start_time);
+      setEndTime(systemInfo.scheduled_maintenance.end_time);
     }
-    if (systemInfo.data.status === 2) {
-      setStatus(2);
+    if (systemInfo.status === MaintenanceStatus.Maintenance) {
+      setStatus(MaintenanceStatus.Maintenance);
     }
   }, [systemInfo, config]);
 

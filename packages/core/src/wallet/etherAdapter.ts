@@ -1,10 +1,10 @@
-import { IWalletAdapter, WalletAdapterOptions } from "./adapter";
-import { BrowserProvider, ethers, toNumber } from "ethers";
 import {
   EthersError,
   getParsedEthersError,
 } from "@enzoferey/ethers-error-parser";
+import { BrowserProvider, ethers, toNumber } from "ethers";
 import { API } from "@orderly.network/types";
+import { IWalletAdapter, WalletAdapterOptions } from "./adapter";
 
 export interface EtherAdapterOptions {
   provider: any;
@@ -28,11 +28,11 @@ export class EtherAdapter implements IWalletAdapter {
     this._address = options.address;
   }
 
-  parseUnits(amount: string) {
-    return ethers.parseUnits(amount, 6).toString();
+  parseUnits(amount: string, decimals: number) {
+    return ethers.parseUnits(amount, decimals).toString();
   }
-  formatUnits(amount: string) {
-    return ethers.formatUnits(amount, 6);
+  formatUnits(amount: string, decimals: number) {
+    return ethers.formatUnits(amount, decimals);
   }
   getBalance(userAddress: string): Promise<any> {
     // return contract.balanceOf(userAddress);
@@ -40,7 +40,7 @@ export class EtherAdapter implements IWalletAdapter {
       (res) => {
         return res;
       },
-      (error) => {}
+      (error) => {},
     );
   }
 
@@ -54,7 +54,7 @@ export class EtherAdapter implements IWalletAdapter {
     params: any[],
     options: {
       abi: any;
-    }
+    },
   ): Promise<any> {
     //
     const singer = await this.provider?.getSigner();
@@ -74,7 +74,7 @@ export class EtherAdapter implements IWalletAdapter {
     params: any[],
     options: {
       abi: any;
-    }
+    },
   ): Promise<any> {
     // const singer = await this.provider?.getSigner();
     // const contract = new ethers.Contract(address, options.abi, singer);
@@ -104,7 +104,7 @@ export class EtherAdapter implements IWalletAdapter {
 
   async send(
     method: string,
-    params: Array<any> | Record<string, any>
+    params: Array<any> | Record<string, any>,
   ): Promise<any> {
     return await this.provider?.send(method, params);
   }
@@ -120,7 +120,7 @@ export class EtherAdapter implements IWalletAdapter {
     },
     options: {
       abi: any;
-    }
+    },
   ): Promise<ethers.TransactionResponse> {
     const singer = await this.provider?.getSigner();
     if (!singer) {
@@ -130,13 +130,13 @@ export class EtherAdapter implements IWalletAdapter {
     const contract = new ethers.Contract(
       contractAddress,
       options.abi,
-      this.provider
+      this.provider,
     );
 
     // contract.interface.getAbiCoder().encode(tx.data);
     const encodeFunctionData = contract.interface.encodeFunctionData(
       method,
-      payload.data
+      payload.data,
     );
 
     const tx: ethers.TransactionRequest = {
@@ -162,12 +162,15 @@ export class EtherAdapter implements IWalletAdapter {
   }
 
   async getTransactionRecipect(txHash: string) {
-
     await this.provider!.getTransactionReceipt(txHash);
-
   }
 
-  async pollTransactionReceiptWithBackoff(txHash: string, baseInterval = 1000, maxInterval = 6000, maxRetries= 30) {
+  async pollTransactionReceiptWithBackoff(
+    txHash: string,
+    baseInterval = 1000,
+    maxInterval = 6000,
+    maxRetries = 30,
+  ) {
     let interval = baseInterval;
     let retries = 0;
 
@@ -188,7 +191,7 @@ export class EtherAdapter implements IWalletAdapter {
       retries++;
     }
 
-    throw new Error('Transaction did not complete after maximum retries.');
+    throw new Error("Transaction did not complete after maximum retries.");
   }
 
   private async estimateGas(tx: ethers.TransactionRequest): Promise<number> {
@@ -203,7 +206,7 @@ export class EtherAdapter implements IWalletAdapter {
 
   async verify(
     data: { domain: any; message: any; types: any },
-    signature: string
+    signature: string,
   ) {
     const { domain, types, message } = data;
 

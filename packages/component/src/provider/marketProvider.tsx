@@ -1,6 +1,6 @@
 import { createContext, useCallback } from "react";
 import { useAccount, useMutation, useConfig } from "@orderly.network/hooks";
-import { modal } from "@/modal";
+import { modal } from "@orderly.network/ui";
 import { toast } from "@/toast";
 
 interface MarketContextState {
@@ -22,7 +22,7 @@ export const MarketProvider = (props: any) => {
 
   const getTestUSDC = useCallback(() => {
     return doGetTestUSDC({
-      chain_id: account.wallet?.chainId.toString(),
+      chain_id: account.walletAdapter?.chainId.toString(),
       user_address: state.address,
       broker_id: brokerId,
     })

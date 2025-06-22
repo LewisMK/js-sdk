@@ -1,10 +1,13 @@
-import useSWR from "swr";
-import { fetcher } from "./utils/fetcher";
-import useSWRMutation, {
-  type SWRMutationConfiguration,
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import type { SWRHook } from "swr";
+import type {
   SWRMutationResponse,
+  SWRMutationConfiguration,
 } from "swr/mutation";
+import useSWRMutation from "swr/mutation";
+import { SDKError } from "@orderly.network/types";
 import { useConfig } from "./useConfig";
+import { fetcher } from "./utils/fetcher";
 
 /**
  * useQuery
@@ -13,21 +16,21 @@ import { useConfig } from "./useConfig";
  * @param options
  */
 export const useLazyQuery = <T, R = any>(
-  query: Parameters<typeof useSWR>["0"],
+  query: Parameters<SWRHook>[0],
   options?: SWRMutationConfiguration<any, any> & {
     formatter?: (data: any) => R;
     init?: RequestInit;
-  }
+  },
 ): SWRMutationResponse => {
   const apiBaseUrl = useConfig("apiBaseUrl");
   const { formatter, init, ...swrOptions } = options || {};
   // check the query is public api
   // if (typeof query === "string" && !query.startsWith("/v1/public")) {
-  //   throw new Error("useQuery is only for public api");
+  //   throw new SDKError("useQuery is only for public api");
   // }
 
   if (typeof apiBaseUrl === "undefined") {
-    throw new Error("please add OrderlyConfigProvider to your app");
+    throw new SDKError("please add OrderlyConfigProvider to your app");
   }
 
   // @ts-ignore
@@ -38,17 +41,13 @@ export const useLazyQuery = <T, R = any>(
       if (options?.arg) {
         // const searchParams = new URLSearchParams(init.arg);
         // url = `${url}?${encodeURIComponent(searchParams.toString())}`;
-        const queryString = Object.entries(options.arg)
-          .map(
-            ([key, value]) => `${key}=${encodeURIComponent(value as string)}`
-          )
+        const queryString = Object.entries<string>(options.arg)
+          .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
           .join("&");
         url = `${url}?${queryString}`;
       }
-      return fetcher(url, init, {
-        formatter,
-      });
+      return fetcher(url, init, { formatter });
     },
-    swrOptions
+    swrOptions,
   );
 };
